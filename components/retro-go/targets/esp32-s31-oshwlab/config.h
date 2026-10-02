@@ -44,6 +44,11 @@
     ILI9341_CMD(0x21); /* Invert colors, needed by most IPS ST7789 panels; remove if colors look inverted */
 
 
+// Pin notes (ESP32-S31 datasheet v0.5, section 2.3.4): none of the pins below are strapping (GPIO36/37/60/61),
+// USB Serial/JTAG (GPIO33/34), JTAG (GPIO54-57), UART0 (GPIO58/59) or flash (GPIO26-28/30-32) pins.
+// GPIO1 is shared with the 32kHz crystal pin (XTAL_32K_P), so no 32kHz crystal can be fitted on this board.
+// GPIO1-18 are powered by VDDPST_1, GPIO38-48 by VDDPST_3, GPIO20-25 (SD) by the internal VDDPST_SD domain.
+
 // Input
 // Refer to rg_input.h to see all available RG_KEY_* and RG_GAMEPAD_*_MAP types
 #define RG_GAMEPAD_GPIO_MAP {\
