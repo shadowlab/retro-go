@@ -5,7 +5,8 @@
 #define RG_STORAGE_ROOT             "/sd"
 // #define RG_STORAGE_SDSPI_HOST       SPI3_HOST
 // #define RG_STORAGE_SDSPI_SPEED      SDMMC_FREQ_DEFAULT
-// IO20-25 are the fixed IOMUX pins of SDMMC slot 0 on ESP32-S31 (slot 1 is IO35-40), see esp_hal_sd/esp32s31/include/soc/sdmmc_pins.h
+// The module's SD pins (IO20-25) are the fixed IOMUX pins of SDMMC slot 0 in ESP-IDF (slot 1 would be IO35-40),
+// see esp_hal_sd/esp32s31/include/soc/sdmmc_pins.h
 #define RG_STORAGE_SDMMC_HOST       SDMMC_HOST_SLOT_0
 #define RG_STORAGE_SDMMC_SPEED      SDMMC_FREQ_DEFAULT
 #define RG_STORAGE_SDMMC_WIDTH      4
@@ -44,16 +45,18 @@
     ILI9341_CMD(0x21); /* Invert colors, needed by most IPS ST7789 panels; remove if colors look inverted */
 
 
-// Pin notes (ESP32-S31 datasheet v0.5, section 2.3.4): none of the pins below are strapping (GPIO36/37/60/61),
-// USB Serial/JTAG (GPIO33/34), JTAG (GPIO54-57), UART0 (GPIO58/59) or flash (GPIO26-28/30-32) pins.
-// GPIO1 is shared with the 32kHz crystal pin (XTAL_32K_P), so no 32kHz crystal can be fitted on this board.
-// Module: ESP32-S31-WROOM-3U-N16R16V (16MB quad SPI flash, 16MB octal PSRAM), datasheet v0.7. It has one 3V3 supply
-// (pins 3, 4: 3.0-3.6V, supply must deliver at least 0.6A) and exposes every GPIO used here. The chip's VDDPST_x/VDDA
-// rails, including the SD domain source (VDDPST_2), are inside the module, so nothing needs to be wired for them.
-// The module labels the SD pins SD_D0-SD_D3/SD_CLK/SD_CMD (module pins 27-32, GPIO20-25).
-// Module schematic (WROOM-3U, datasheet figure 8-2): pin 43 VCCA/VDDPST_2 is tied to 3V3 (0.1uF), IO36 has a 10K pull-up to 3V3
-// (strapping, selects 3.3V flash, do not pull it low), and the SD lines have NO pull-ups on the module: fit external
-// pull-ups (typically 10K) on SD_CMD and SD_D0-SD_D3 on the carrier board.
+// Module: ESP32-S31-WROOM-3U-N16R16V (16MB quad SPI flash, 16MB octal PSRAM), datasheet v0.7.
+// Power: one 3V3 supply (module pins 3, 4: 3.0-3.6V, the supply must deliver at least 0.6A). Do not leave EN (pin 5) floating.
+// All internal supply rails are fed from 3V3 inside the module, nothing else needs to be wired for them.
+//
+// Pins: the module exposes every GPIO used here. None of them are strapping pins (IO36, IO37, IO60, IO61), USB pins
+// (IO33, IO34, USB_DP, USB_DM), JTAG pins (IO54-IO57) or UART0 pins (TX0, RX0). Module pins 33-39 (flash) are NC.
+// IO1 is shared with the 32kHz crystal pin (XTAL_32K_P), so no 32kHz crystal can be fitted on this board.
+// IO36 has a 10K pull-up to 3V3 on the module (strapping, selects 3.3V flash), do not pull it low.
+//
+// SD card: the module labels the pins SD_D0-SD_D3/SD_CLK/SD_CMD (module pins 27-32, GPIO20-25). The module has NO pull-ups
+// on these lines: fit external pull-ups (typically 10K) on SD_CMD and SD_D0-SD_D3 on the carrier board.
+// The module ties VCCA/VDDPST_2 (the 3.3V source of the SD I/O domain) to 3V3, see the schematic (datasheet figure 8-2).
 
 // Input
 // Refer to rg_input.h to see all available RG_KEY_* and RG_GAMEPAD_*_MAP types
@@ -83,7 +86,7 @@
 #define RG_GPIO_LCD_BCKL            GPIO_NUM_39
 #define RG_GPIO_LCD_RST             GPIO_NUM_9
 
-// SD card (SDMMC slot 0, 4-bit). The S31 SDMMC uses fixed IOMUX pins, so these are for reference only
+// SD card (SDMMC slot 0, 4-bit). The SDMMC pins of the ESP32-S31 are fixed (IOMUX), so these are for reference only
 // (rg_storage.c only applies them on chips that route SDMMC through the GPIO matrix).
 #define RG_GPIO_SDSPI_D0            GPIO_NUM_20
 #define RG_GPIO_SDSPI_D1            GPIO_NUM_21
