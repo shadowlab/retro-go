@@ -5,7 +5,8 @@
 #define RG_STORAGE_ROOT             "/sd"
 // #define RG_STORAGE_SDSPI_HOST       SPI3_HOST
 // #define RG_STORAGE_SDSPI_SPEED      SDMMC_FREQ_DEFAULT
-#define RG_STORAGE_SDMMC_HOST       SDMMC_HOST_SLOT_1
+// IO20-25 are the fixed IOMUX pins of SDMMC slot 0 on ESP32-S31 (slot 1 is IO35-40), see esp_hal_sd/esp32s31/include/soc/sdmmc_pins.h
+#define RG_STORAGE_SDMMC_HOST       SDMMC_HOST_SLOT_0
 #define RG_STORAGE_SDMMC_SPEED      SDMMC_FREQ_DEFAULT
 #define RG_STORAGE_SDMMC_WIDTH      4
 // #define RG_STORAGE_FLASH_PARTITION  "vfs"
@@ -71,7 +72,8 @@
 #define RG_GPIO_LCD_BCKL            GPIO_NUM_39
 #define RG_GPIO_LCD_RST             GPIO_NUM_9
 
-// SD card (SDMMC slot 1, 4-bit)
+// SD card (SDMMC slot 0, 4-bit). The S31 SDMMC uses fixed IOMUX pins, so these are for reference only
+// (rg_storage.c only applies them on chips that route SDMMC through the GPIO matrix).
 #define RG_GPIO_SDSPI_D0            GPIO_NUM_20
 #define RG_GPIO_SDSPI_D1            GPIO_NUM_21
 #define RG_GPIO_SDSPI_D2            GPIO_NUM_22

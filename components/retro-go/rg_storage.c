@@ -125,9 +125,9 @@ void rg_storage_init(void)
 
     sdmmc_host_t host_config = SDMMC_HOST_DEFAULT();
 #if RG_STORAGE_SDMMC_WIDTH == 4
-    host_config.flags = SDMMC_HOST_FLAG_4BIT;
+    host_config.flags = SDMMC_HOST_FLAG_4BIT | (host_config.flags & SDMMC_HOST_FLAG_DEINIT_ARG);
 #else
-    host_config.flags = SDMMC_HOST_FLAG_1BIT;
+    host_config.flags = SDMMC_HOST_FLAG_1BIT | (host_config.flags & SDMMC_HOST_FLAG_DEINIT_ARG);
 #endif
     host_config.slot = RG_STORAGE_SDMMC_HOST;
     host_config.max_freq_khz = RG_STORAGE_SDMMC_SPEED;
