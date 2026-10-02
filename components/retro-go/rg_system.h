@@ -197,6 +197,7 @@ typedef struct
     float totalFPS;
     float speedPercent;
     float busyPercent;
+    float displayBusyPercent; // Time the display task spent presenting frames (includes waiting on the SPI transfers)
     int64_t busyTime;
     int64_t lastTick;
     int ticks;

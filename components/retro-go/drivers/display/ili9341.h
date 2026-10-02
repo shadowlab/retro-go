@@ -112,6 +112,11 @@ static void spi_init(void)
         .sclk_io_num = RG_GPIO_LCD_CLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
+    #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0) && CONFIG_FREERTOS_NUMBER_OF_CORES > 1
+        // By default the interrupt goes to the core that initializes the bus (the main task, which runs the emulation).
+        // The spi task below runs on core 1, so keep the transfer-complete interrupts there as well.
+        .isr_cpu_id = ESP_INTR_CPU_AFFINITY_1,
+    #endif
     };
 
     const spi_device_interface_config_t devcfg = {
