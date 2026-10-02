@@ -169,3 +169,9 @@ CONFIG_I2S_SUPPRESS_DEPRECATE_WARN=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../partitions.csv"
 CONFIG_PARTITION_TABLE_FILENAME="../partitions.csv"
+
+# Wi-Fi goes through the on-board ESP32-C6 (ESP-Hosted over SDIO, SDMMC slot 1). The board preset selects the
+# pins, the C6 is powered by an IO expander so it can't be initialized before app_main (see rg_tab5_wifi_prepare)
+CONFIG_ESP32P4_TAB5_C6_BOARD=y
+# CONFIG_ESP_HOSTED_AUTO_CALL_INIT_BEFORE_APP_MAIN is not set
+CONFIG_WIFI_RMT_NVS_ENABLED=n

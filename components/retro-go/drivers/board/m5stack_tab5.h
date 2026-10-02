@@ -14,6 +14,10 @@ void rg_tab5_reset_lcd_and_touch(void);
 
 // Power rails and misc outputs of the expanders
 void rg_tab5_set_wifi_power(bool enable);
+
+// Powers the ESP32-C6 and connects to its ESP-Hosted firmware over SDIO. Called once by rg_network_init(), returns
+// false (without retrying) if the co-processor doesn't answer.
+bool rg_tab5_wifi_prepare(void);
 void rg_tab5_set_usb_5v(bool enable);
 void rg_tab5_set_charging(bool enable);
 bool rg_tab5_headphones_detected(void);

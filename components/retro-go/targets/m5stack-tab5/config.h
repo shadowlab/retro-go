@@ -4,6 +4,8 @@
 // Board initialization (I2C bus, IO expanders, charging), called very early by rg_system_init()
 void rg_tab5_init(void);
 #define RG_TARGET_INIT()            rg_tab5_init()
+bool rg_tab5_wifi_prepare(void);
+#define RG_TARGET_NETWORK_PREPARE() rg_tab5_wifi_prepare()
 
 // I2C (system bus: IO expanders, codecs, touch, battery monitor, RTC, IMU)
 #define RG_GPIO_I2C_SDA             GPIO_NUM_31

@@ -19,3 +19,8 @@ dependencies:
     version: "^1.2.1"
     rules:
       - if: "target == esp32p4"
+  # Wi-Fi through the ESP32-C6 co-processor (esp_wifi forwards to it with esp-idf 6.x on chips without a radio)
+  espressif/esp_hosted:
+    version: "^3.0.9"
+    rules:
+      - if: "target == esp32p4"

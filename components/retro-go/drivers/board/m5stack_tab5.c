@@ -6,6 +6,9 @@
 #include "m5stack_tab5.h"
 
 #include <driver/gpio.h>
+#ifdef RG_ENABLE_NETWORKING
+#include <esp_hosted.h>
+#endif
 
 // The two expanders are PI4IOE5V6408 (8 pins each) on the system I2C bus
 #define EXPANDER1_ADDR 0x43 // address pin low
@@ -141,3 +144,25 @@ bool rg_tab5_headphones_detected(void)
 }
 
 #endif
+
+bool rg_tab5_wifi_prepare(void)
+{
+#ifdef RG_ENABLE_NETWORKING
+    static int state = 0; // 0 = not tried, 1 = ready, -1 = failed
+    if (state == 0)
+    {
+        // The C6 sits behind IO expander 2, rg_tab5_init() already powered it. ESP-Hosted resets it through its
+        // reset GPIO, waits for it to boot and then brings up the SDIO link.
+        rg_tab5_set_wifi_power(true);
+        int err = esp_hosted_init();
+        if (err == 0)
+            err = esp_hosted_connect_to_slave();
+        if (err != 0)
+            RG_LOGE("ESP32-C6 did not respond (%d)", err);
+        state = err == 0 ? 1 : -1;
+    }
+    return state == 1;
+#else
+    return false;
+#endif
+}

@@ -178,7 +178,11 @@ bool rg_network_wifi_set_config(const rg_wifi_config_t *config)
 bool rg_network_wifi_start(void)
 {
 #ifdef RG_ENABLE_NETWORKING
-    RG_ASSERT(network_state > RG_NETWORK_DISABLED, "Please call rg_network_init() first");
+    if (network_state <= RG_NETWORK_DISABLED) // rg_network_init() failed or wasn't called, e.g. no Wi-Fi hardware
+    {
+        RG_LOGW("Can't start wifi: the network stack isn't initialized.\n");
+        return false;
+    }
     wifi_config_t config = {0};
     esp_err_t err;
 
@@ -219,7 +223,8 @@ fail:
 void rg_network_wifi_stop(void)
 {
 #ifdef RG_ENABLE_NETWORKING
-    RG_ASSERT(network_state > RG_NETWORK_DISABLED, "Please call rg_network_init() first");
+    if (network_state <= RG_NETWORK_DISABLED)
+        return;
     esp_wifi_stop();
     netif = NULL;
 #endif
@@ -266,6 +271,16 @@ bool rg_network_init(void)
 #ifdef RG_ENABLE_NETWORKING
     if (network_state > RG_NETWORK_DISABLED)
         return true;
+
+#ifdef RG_TARGET_NETWORK_PREPARE
+    // Some targets need to bring up the radio first (for example a Wi-Fi co-processor)
+    if (!RG_TARGET_NETWORK_PREPARE())
+    {
+        RG_LOGE("Wi-Fi is not available on this device");
+        return false;
+    }
+#endif
+
     network_state = RG_NETWORK_DISCONNECTED;
 
     // Init event loop first

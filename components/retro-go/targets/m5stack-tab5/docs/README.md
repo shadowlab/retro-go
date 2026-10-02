@@ -1,7 +1,7 @@
 # M5Stack Tab5
 
 Port for the [M5Stack Tab5](https://docs.m5stack.com/en/core/Tab5): ESP32-P4 (dual core RISC-V, 360 MHz), 32 MB PSRAM,
-16 MB flash, 5" 720x1280 MIPI-DSI display. The ESP32-C6 radio co-processor is not used yet.
+16 MB flash, 5" 720x1280 MIPI-DSI display, Wi-Fi through the on-board ESP32-C6.
 
 **Status: compiles with ESP-IDF 6.1 (all ten emulator cores and apps). It has not been run on hardware.**
 Everything below describes intent and what is known to be unverified.
@@ -32,6 +32,7 @@ Requirements and caveats:
 | Touch | ST7123/ST7121 touch controller (I2C 0x55). Gestures drive the menus: drag = d-pad, tap = A, long press = B. In game only the top-left corner (MENU) reacts. `drivers/input/touch_st712x.c` |
 | USB gamepads | USB-A host (5 V from the IO expander). HID gamepads/joysticks and boot keyboards, hot-plug, up to 4 devices merged. `drivers/input/usb_gamepad.c` |
 | Audio | ES8388 codec over I2S (MCLK on GPIO30), configured through `esp_codec_dev`. Volume is done in software |
+| Wi-Fi | ESP32-C6 co-processor through ESP-Hosted (SDIO, SDMMC slot 1, reset on GPIO15), see below |
 | Storage | SD card, SDMMC slot 0, 4-bit, powered from on-chip LDO channel 4 |
 | IO expanders | Two PI4IOE5V6408 (0x43, 0x44): LCD/touch reset, speaker amp, USB 5 V, charging, Wi-Fi power. `drivers/board/m5stack_tab5.c` |
 
@@ -43,6 +44,21 @@ The Tab5 has no hardware buttons, so input is USB or touch only. Plug a gamepad 
 Button 1-4 (west, south, east, north on most pads) map to Y, B, A, X, 5/6 and 7/8 to L/R, 9 to Select, 10 to Start,
 13 to Menu, 14 to Option. This matches DualShock 4, DualSense and most DInput pads. Not handled: Xbox pads (not HID
 class), and the Switch Pro Controller needs a USB handshake that isn't implemented. There is no remapping UI yet.
+
+## Wi-Fi
+
+`esp_wifi` forwards to the ESP32-C6 on esp-idf 6.x (`espressif/esp_hosted`, pulled by the component manager). The
+sdkconfig selects ESP-Hosted's `ESP32P4_TAB5_C6_BOARD` preset, which matches M5Stack's BSP: SDIO 4-bit at 40 MHz on
+CLK 12, CMD 13, D0-D3 11-8, C6 reset on GPIO15, powered by IO expander 2. ESP-Hosted is not started before `app_main`
+(the C6 isn't powered yet at that point). `rg_network_init()` calls `rg_tab5_wifi_prepare()`, which resets the C6 and
+connects to it. If it doesn't answer, `rg_network_init()` returns false and the launcher carries on without Wi-Fi. The SD card (slot 0)
+and the C6 (slot 1) share the SDMMC controller as in ESP-Hosted's own `mcu_hosted_sdio_sdmmc_combined` example.
+
+- **Firmware match:** the C6 ships with ESP-Hosted *slave* firmware (M5Stack's demo includes
+  `ESP32C6-WiFi-SDIO-Interface-V1.4.1`) while this build uses the ESP-Hosted *host* 3.0.x. Host and slave versions
+  are expected to match, so the C6 will probably need to be flashed with an ESP-Hosted 3.x SDIO slave (the `slave`
+  example of esp-hosted, built for esp32c6). Not verified, and the C6 flashing procedure isn't covered here.
+- Untested on hardware. Bluetooth through the C6 is not set up.
 
 ## Emulators
 
@@ -62,5 +78,5 @@ and fmsx build for the ESP32-P4. Review notes, none of which could be measured w
 
 ## Not done
 
-Battery gauge (INA226), RTC (RX8130), microphone (ES7210), Wi-Fi/Bluetooth through the C6, touch in the on-screen
+Battery gauge (INA226), RTC (RX8130), microphone (ES7210), Bluetooth through the C6, touch in the on-screen
 keyboard, and a tap-on-row menu selection.
