@@ -90,6 +90,11 @@ typedef struct
 
 void rg_input_init(void);
 void rg_input_deinit(void);
+// Touch gestures only drive the UI while a dialog is open (or in the launcher). Elsewhere touch is
+// restricted to the menu hot corner so that stray touches don't press game buttons.
+void rg_input_touch_ui_enter(void);
+void rg_input_touch_ui_leave(void);
+bool rg_input_touch_ui_active(void);
 bool rg_input_key_is_present(rg_key_t mask);
 bool rg_input_key_is_pressed(rg_key_t mask);
 bool rg_input_wait_for_key(rg_key_t mask, bool pressed, int timeout_ms);

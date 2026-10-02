@@ -8,6 +8,9 @@
 #ifdef RG_GAMEPAD_USB_HID
 #include "drivers/input/usb_gamepad.h"
 #endif
+#ifdef RG_TOUCH_ST712X
+#include "drivers/input/touch_st712x.h"
+#endif
 
 #ifdef ESP_PLATFORM
 #include <driver/gpio.h>
@@ -217,6 +220,10 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
     state |= rg_usb_gamepad_read();
 #endif
 
+#if defined(RG_TOUCH_ST712X)
+    state |= rg_touch_read();
+#endif
+
     if (out)
         *out = state;
     return true;
@@ -370,6 +377,11 @@ void rg_input_init(void)
     gamepad_mapped |= RG_KEY_ALL & ((1 << RG_KEY_COUNT) - 1);
 #endif
 
+#if defined(RG_TOUCH_ST712X)
+    RG_LOGI("Initializing touch driver...");
+    rg_touch_init();
+#endif
+
     // The first read returns bogus data in some drivers, waste it.
     rg_input_read_gamepad_raw(NULL);
 
@@ -386,6 +398,24 @@ void rg_input_deinit(void)
     // while (gamepad_state != -1)
     //     rg_task_yield();
     RG_LOGI("Input terminated.\n");
+}
+
+static int touch_ui_depth = 0;
+
+void rg_input_touch_ui_enter(void)
+{
+    touch_ui_depth++;
+}
+
+void rg_input_touch_ui_leave(void)
+{
+    if (touch_ui_depth > 0)
+        touch_ui_depth--;
+}
+
+bool rg_input_touch_ui_active(void)
+{
+    return touch_ui_depth > 0 || rg_system_get_app()->isLauncher;
 }
 
 bool rg_input_key_is_present(rg_key_t mask)

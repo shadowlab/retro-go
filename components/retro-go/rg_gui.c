@@ -908,6 +908,7 @@ intptr_t rg_gui_dialog(const char *title, const rg_gui_option_t *options_const, 
     int sel = RG_MIN(RG_MAX(0, selected_index), options_count - 1);
     int sel_old = -1;
 
+    rg_input_touch_ui_enter();
     rg_gui_draw_status_bars();
     rg_gui_draw_dialog(title, options, options_count, sel);
     rg_input_wait_for_key(RG_KEY_ALL, false, 1000);
@@ -1005,6 +1006,7 @@ intptr_t rg_gui_dialog(const char *title, const rg_gui_option_t *options_const, 
         rg_system_tick(0);
     }
 
+    rg_input_touch_ui_leave();
     rg_input_wait_for_key(joystick, false, 1000);
     rg_display_force_redraw();
     // free(shadow_options);
