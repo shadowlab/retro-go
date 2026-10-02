@@ -14,6 +14,12 @@ else() # esp-idf 4.1 - 4.4
     set(COMPONENT_REQUIRES "spi_flash fatfs app_update esp_adc_cal json nvs_flash esp_wifi esp_http_client")
 endif()
 
+# Targets with a MIPI-DSI display, touch, codecs and USB host (see idf_component.yml)
+if(IDF_TARGET STREQUAL "esp32p4")
+    list(APPEND COMPONENT_REQUIRES esp_lcd esp_driver_ppa esp_driver_ledc esp_driver_i2c esp_driver_i2s esp_mm esp_pm
+         espressif__esp_lcd_st7121 espressif__esp_lcd_touch_st7123 espressif__esp_codec_dev espressif__usb_host_hid)
+endif()
+
 register_component()
 
 # Small size is preferred because of the small cache and most things here aren't performance sensitive!

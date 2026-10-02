@@ -22,7 +22,8 @@ void rg_tab5_init(void);
 #define RG_AUDIO_USE_EXT_DAC        1   // 0 = Disable, 1 = Enable
 
 // Video (placeholder, replaced by the MIPI-DSI driver)
-#define RG_SCREEN_DRIVER            100
+#define RG_SCREEN_DRIVER            2
+#define RG_GPIO_LCD_BCKL            GPIO_NUM_22
 #define RG_SCREEN_HOST              0
 #define RG_SCREEN_SPEED             0
 #define RG_SCREEN_BACKLIGHT         1

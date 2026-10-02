@@ -1,0 +1,21 @@
+## IDF Component Manager manifest for the retro-go component. Only the dependencies of targets that need them are
+## listed, other targets do not download anything.
+dependencies:
+  # M5Stack Tab5: MIPI-DSI panel (ST7121), capacitive touch (ST7123 family), audio codecs and USB host gamepads
+  espressif/esp_lcd_st7121:
+    version: "^1.0.1"
+    rules:
+      - if: "target == esp32p4"
+  espressif/esp_lcd_touch_st7123:
+    version: "^1.0.2"
+    rules:
+      - if: "target == esp32p4"
+  espressif/esp_codec_dev:
+    version: "^1.6.2"
+    rules:
+      - if: "target == esp32p4"
+  # Also provides the USB host stack (espressif/usb) with esp-idf 6.0+, where it is no longer part of esp-idf
+  espressif/usb_host_hid:
+    version: "^1.2.1"
+    rules:
+      - if: "target == esp32p4"
