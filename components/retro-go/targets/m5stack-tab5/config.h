@@ -13,6 +13,11 @@ bool rg_tab5_rtc_write(time_t utc);
 #define RG_TARGET_RTC_READ(utc)     rg_tab5_rtc_read(utc)
 #define RG_TARGET_RTC_WRITE(utc)    rg_tab5_rtc_write(utc)
 
+// Battery (INA226 power monitor): level %, volts, charging. Driver 3 is the target's own function.
+bool rg_tab5_battery_read(float *level, float *volts, bool *charging);
+#define RG_BATTERY_DRIVER           3
+#define RG_TARGET_BATTERY_READ(level, volts, charging) rg_tab5_battery_read(level, volts, charging)
+
 // I2C (system bus: IO expanders, codecs, touch, battery monitor, RTC, IMU)
 #define RG_GPIO_I2C_SDA             GPIO_NUM_31
 #define RG_GPIO_I2C_SCL             GPIO_NUM_32

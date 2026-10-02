@@ -34,6 +34,7 @@ Requirements and caveats:
 | Audio | ES8388 codec over I2S (MCLK on GPIO30), configured through `esp_codec_dev`. Volume is done in software |
 | Wi-Fi | ESP32-C6 co-processor through ESP-Hosted (SDIO, SDMMC slot 1, reset on GPIO15), see below |
 | RTC | RX8130 (I2C 0x32), holds UTC. Read at boot by `rg_system_load_time()` (overrides the saved clock file when valid), written by `rg_system_save_time()`, which the system calls when the time jumps, for example after an NTP sync. Invalid after a power loss (VLF flag) until set again. The backup battery charging is enabled like in M5Stack's firmware. `drivers/board/rx8130.c` |
+| Battery | INA226 power monitor (I2C 0x41, 5 mOhm shunt) read every 2 s by the input task (`RG_BATTERY_DRIVER 3`). The bus voltage is taken as the voltage of the 2S Li-ion pack and mapped to a percentage with a per-cell curve (estimate only, no coulomb counting); positive shunt current (more than 50 mA) means charging, the sign M5Stack's demo uses. `drivers/board/ina226.c` |
 | Storage | SD card, SDMMC slot 0, 4-bit, powered from on-chip LDO channel 4 |
 | IO expanders | Two PI4IOE5V6408 (0x43, 0x44): LCD/touch reset, speaker amp, USB 5 V, charging, Wi-Fi power. `drivers/board/m5stack_tab5.c` |
 
@@ -103,5 +104,5 @@ most promising change if a core turns out to be too slow, most likely snes9x.
 
 ## Not done
 
-Battery gauge (INA226), microphone (ES7210), Bluetooth through the C6, touch in the on-screen
+Microphone (ES7210), Bluetooth through the C6, touch in the on-screen
 keyboard, and a tap-on-row menu selection.

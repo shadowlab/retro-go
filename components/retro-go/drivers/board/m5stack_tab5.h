@@ -26,3 +26,6 @@ bool rg_tab5_headphones_detected(void);
 // RX8130 real time clock, stores UTC. Read fails if the chip is missing or lost power (time invalid).
 bool rg_tab5_rtc_read(time_t *utc);
 bool rg_tab5_rtc_write(time_t utc);
+
+// Battery state from the INA226 power monitor. Fails if the chip doesn't answer.
+bool rg_tab5_battery_read(float *level, float *volts, bool *charging);

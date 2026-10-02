@@ -96,6 +96,20 @@ bool rg_input_read_battery_raw(rg_battery_t *out)
         return false;
     raw_value = data[4];
     charging = data[4] == 255;
+#elif RG_BATTERY_DRIVER == 3 /* Provided by the target */
+    float level_percent = 0.f, volts = 0.f;
+    if (!RG_TARGET_BATTERY_READ(&level_percent, &volts, &charging))
+        return false;
+    if (out)
+    {
+        *out = (rg_battery_t){
+            .level = RG_MAX(0.f, RG_MIN(100.f, level_percent)),
+            .volts = volts,
+            .present = present,
+            .charging = charging,
+        };
+    }
+    return true;
 #else
     return false;
 #endif

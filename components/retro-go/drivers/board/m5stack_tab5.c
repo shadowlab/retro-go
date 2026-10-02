@@ -5,6 +5,7 @@
 
 #include "m5stack_tab5.h"
 #include "rx8130.h"
+#include "ina226.h"
 
 #include <driver/gpio.h>
 #ifdef RG_ENABLE_NETWORKING
@@ -184,6 +185,38 @@ bool rg_tab5_rtc_write(time_t utc)
     if (ok && (flag & RX8130_FLAG_VLF))
         rg_i2c_write_byte(RX8130_ADDR, RX8130_REG_FLAG, flag & ~RX8130_FLAG_VLF); // The time is valid again
     return ok;
+}
+
+static bool ina226_read(uint8_t reg, int16_t *out)
+{
+    uint8_t data[2];
+    if (!rg_i2c_read(INA226_ADDR, reg, data, sizeof(data)))
+        return false;
+    *out = (int16_t)((data[0] << 8) | data[1]); // MSB first
+    return true;
+}
+
+bool rg_tab5_battery_read(float *level, float *volts, bool *charging)
+{
+    static bool configured = false;
+    if (!configured)
+    {
+        const uint8_t config[2] = {INA226_CONFIG_VALUE >> 8, INA226_CONFIG_VALUE & 0xFF};
+        if (!rg_i2c_write(INA226_ADDR, INA226_REG_CONFIG, config, sizeof(config)))
+            return false;
+        configured = true;
+    }
+
+    int16_t bus_raw, shunt_raw;
+    if (!ina226_read(INA226_REG_BUSVOLTAGE, &bus_raw) || !ina226_read(INA226_REG_SHUNTVOLTAGE, &shunt_raw))
+        return false;
+
+    // The bus voltage is taken as the voltage of the 2S battery pack. Current flowing into the pack is positive,
+    // this is the sign M5Stack's demo shows as charging.
+    *volts = ina226_bus_volts(bus_raw);
+    *level = tab5_battery_percent(*volts);
+    *charging = ina226_shunt_amps(shunt_raw, TAB5_SHUNT_OHMS) > 0.05f;
+    return true;
 }
 
 bool rg_tab5_wifi_prepare(void)
