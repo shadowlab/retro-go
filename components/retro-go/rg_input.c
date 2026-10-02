@@ -5,6 +5,10 @@
 #include <string.h>
 #include <math.h>
 
+#ifdef RG_GAMEPAD_USB_HID
+#include "drivers/input/usb_gamepad.h"
+#endif
+
 #ifdef ESP_PLATFORM
 #include <driver/gpio.h>
 #if defined(RG_GAMEPAD_ADC_MAP) || RG_BATTERY_DRIVER == 1
@@ -209,6 +213,10 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
     }
 #endif
 
+#if defined(RG_GAMEPAD_USB_HID)
+    state |= rg_usb_gamepad_read();
+#endif
+
     if (out)
         *out = state;
     return true;
@@ -354,6 +362,12 @@ void rg_input_init(void)
     {
         RG_LOGE("Only ADC1 and ADC2 are supported for ADC battery driver!");
     }
+#endif
+
+#if defined(RG_GAMEPAD_USB_HID)
+    RG_LOGI("Initializing USB HID gamepad driver...");
+    rg_usb_gamepad_init();
+    gamepad_mapped |= RG_KEY_ALL & ((1 << RG_KEY_COUNT) - 1);
 #endif
 
     // The first read returns bogus data in some drivers, waste it.
