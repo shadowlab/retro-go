@@ -137,5 +137,7 @@ most promising change if a core turns out to be too slow, most likely snes9x.
 
 ## Not done
 
-Microphone (ES7210), Bluetooth Classic pads (not possible with the C6), touch in the on-screen
+Bluetooth Classic pads (not possible with the C6), touch in the on-screen
 keyboard, and a tap-on-row menu selection.
+
+The microphone (ES7210) is not used by Retro-Go and isn't planned.
