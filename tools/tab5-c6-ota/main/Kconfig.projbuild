@@ -1,0 +1,27 @@
+menu "Tab5 C6 OTA"
+
+    config TAB5_C6_OTA_CHUNK_SIZE
+        int "Bytes sent per OTA write"
+        range 256 4096
+        default 1500
+        help
+            Size of each write sent to the ESP32-C6. Smaller chunks are slower but more forgiving of a marginal
+            SDIO link.
+
+    config TAB5_C6_OTA_MAX_IMAGE_SIZE
+        hex "Largest image the C6 can take"
+        default 0x180000
+        help
+            Size of the OTA app slots of the C6 (the factory firmware that ships with the Tab5 has two of 0x180000).
+            Bigger images are refused before anything is sent.
+
+    config TAB5_C6_OTA_FORCE
+        bool "Send the image even if the C6 reports the same version as the host"
+        default n
+
+    config TAB5_C6_OTA_VERIFY_DELAY_MS
+        int "Time to let the C6 reboot before reading its version again (ms)"
+        range 1000 20000
+        default 4000
+
+endmenu

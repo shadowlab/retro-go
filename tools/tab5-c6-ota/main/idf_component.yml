@@ -1,0 +1,5 @@
+dependencies:
+  espressif/esp_hosted:
+    version: "^3.0.9" # The same version as the Retro-Go Tab5 target, the C6 firmware should match it
+    rules:
+      - if: "target == esp32p4"

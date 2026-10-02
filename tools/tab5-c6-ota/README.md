@@ -1,0 +1,130 @@
+# Tab5: update the firmware of the ESP32-C6 over SDIO
+
+A standalone ESP-IDF application that replaces the firmware of the ESP32-C6 co-processor of the
+[M5Stack Tab5](https://docs.m5stack.com/en/core/Tab5) through the SDIO link it shares with the ESP32-P4, with no soldering
+and no extra hardware. It exists for the Retro-Go Tab5 target (Wi-Fi and Bluetooth go through the C6 with ESP-Hosted 3.x,
+see `components/retro-go/targets/m5stack-tab5/docs/README.md`), but it is independent of Retro-Go.
+
+It is a rework for the Tab5 of [crowpanel-p4-c6-sdio-ota](https://github.com/lboshuizen/crowpanel-p4-c6-sdio-ota) by
+lboshuizen, which does the same for the Elecrow CrowPanel 7" (see `NOTICE`).
+
+**Status: it builds (ESP-IDF 6.1). It has not been run on a Tab5.**
+
+## Why
+
+The Tab5 ships with a C6 running ESP-Hosted slave firmware 1.4.1 (`ESP32C6-WiFi-SDIO-Interface-V1.4.1`, the file in
+M5Stack's `M5Tab5-UserDemo`, which pairs it with ESP-Hosted host 1.4.0). The Retro-Go target uses ESP-Hosted host
+3.0.x, and the host and the co-processor are expected to run matching versions. The stock firmware of the C6 has no UART or
+USB port on the board, so the way to change it is the SDIO link, which is what this does.
+
+The same image also decides what the C6 can do: Bluetooth needs a firmware built with the BT controller enabled, see below.
+
+## How it works
+
+1. The C6 is powered. Its supply is switched by an IO expander (PI4IOE5V6408 at 0x44 on the I2C bus, SDA GPIO31, SCL
+   GPIO32), so a bare ESP-Hosted application would never see it.
+2. ESP-Hosted is started with the pins of the Tab5 (SDMMC slot 1, CLK 12, CMD 13, D0-D3 11-8, C6 reset on GPIO15, 4-bit at
+   20 MHz) and connects to the C6. Wi-Fi is never started.
+3. The embedded image (`firmware/network_adapter.bin`) is checked (ESP image, chip id 13 = ESP32-C6, fits the 0x180000
+   slot, project and version are logged) and the version of the C6 is read. If it already is the version of the host the
+   application stops, unless `TAB5_C6_OTA_FORCE` is set.
+4. The image is sent with ESP-Hosted's OTA calls (begin, write in 1500 byte chunks, end, activate), the C6 writes it to
+   its **inactive** OTA slot and boots it after activation. The running firmware is not touched until then.
+5. After a few seconds the version of the C6 is read again and compared with the host's.
+
+The log marks what happens with `[PHASE]`, `[PASS]`, `[FAIL]`, `[WARN]` and `[DIAG]`.
+
+The OTA slots of the factory firmware: its partition table has two app slots of 0x180000 (1.5 MB) at 0x10000 and
+0x190000, taken from the image in M5Stack's repository. An image bigger than that is refused.
+
+## Get a C6 firmware
+
+You need `network_adapter.bin` for the ESP32-C6 from the same esp-hosted-mcu release as the host (`^3.0.9` in
+`main/idf_component.yml`, which resolves to 3.0.9 today). Prebuilt images are not included in this repository.
+
+**Option 1: a prebuilt image.** ESPHome publishes builds of the co-processor firmware, v3.0.9 is the version of the host:
+
+```bash
+curl -L -o firmware/network_adapter.bin \
+    https://esphome.github.io/esp-hosted-firmware/v3.0.9/network_adapter_esp32c6.bin
+```
+
+I could not download it from where this was written (the network policy there blocks the site), so the file, its hash and
+its contents are unchecked. Verify it before you build, see *Check the image* below. In particular find out whether that build includes the
+Bluetooth controller: I don't know, and Retro-Go's Bluetooth LE controllers need a C6 firmware that has it (Wi-Fi alone works
+without). If it doesn't, use option 2.
+
+**Option 2: build it** from Espressif's co-processor example. It enables Wi-Fi and **disables Bluetooth** by default, so for
+Retro-Go's Bluetooth LE controllers:
+
+```bash
+# esp-hosted-mcu 3.0.9 (the espressif/esp_hosted component), ESP-IDF 5.5 or newer
+git clone --branch 3.0.9 https://github.com/espressif/esp-hosted-mcu   # or use the copy of the managed component
+cd esp-hosted-mcu/examples/ota/coprocessor_ota/cp
+```
+
+Add a file `sdkconfig.bt` next to `sdkconfig.defaults`:
+
+```text
+CONFIG_ESP_HOSTED_CP_FEAT_BT=y
+CONFIG_ESP_HOSTED_CP_BT_ENABLED=y
+CONFIG_ESP_HOSTED_CP_FEAT_BT_HCI_VHCI=y
+CONFIG_BT_ENABLED=y
+CONFIG_BT_CONTROLLER_ONLY=y
+```
+
+then build for the C6 with that file included:
+
+```bash
+idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.esp32c6;sdkconfig.bt" set-target esp32c6
+idf.py build
+```
+
+and copy the application image (`build/*.bin`, the one that is not the bootloader or partition table, it is named after the
+project) to `firmware/network_adapter.bin`. The partition table of the example (`partitions_eh_cp_ota_4m.csv`) is not applied by an
+OTA, only the app slot is replaced, the C6 keeps the layout it has.
+
+**Check the image** (`esptool image_info`, or the log of this application when it starts): chip ESP32-C6, flash mode DIO
+(the CrowPanel author saw failed OTAs with QIO images, the factory image of the Tab5 is DIO), project `network_adapter`,
+version 3.0.9, and not bigger than the slots of the C6 (1.5 MB).
+
+## Build and flash
+
+```bash
+cd tools/tab5-c6-ota
+. $IDF_PATH/export.sh            # ESP-IDF 6.1
+idf.py set-target esp32p4
+idf.py build                     # fails with a message if firmware/network_adapter.bin is missing
+idf.py -p <serial port> flash monitor
+```
+
+This replaces the firmware of the P4 (flash your normal firmware, for example Retro-Go, again afterwards). The C6 keeps its new
+firmware, it has its own flash. Running the application again is safe: it reports that the C6 already is at the version
+of the host.
+
+The sdkconfig selects a P4 **older than revision v3**, like the Retro-Go target (the two kinds of revisions are mutually exclusive
+in ESP-IDF 6.x, a bootloader for one doesn't boot on the other). Change `CONFIG_ESP32P4_SELECTS_REV_LESS_V3` and
+`CONFIG_ESP32P4_REV_MIN_1` in `sdkconfig.defaults` if your chip is v3.
+
+Settings (`idf.py menuconfig`, "Tab5 C6 OTA"): chunk size, the largest image accepted, forcing the transfer, the time to wait
+for the reboot. The SDIO clock is `CONFIG_ESP_HOSTED_HOST_SDIO_CLK_KHZ` in `sdkconfig.defaults` (20000), try 10000 if the
+transfer fails.
+
+## Things that can go wrong
+
+- **No answer from the C6.** This host speaks ESP-Hosted 3.x and the factory firmware is 1.4.1. If the two don't understand each other
+  the transport doesn't come up and nothing can be sent over it. This is the main thing that has not been tried. The other way
+  to change the C6 firmware is its download mode through test pads, not covered here. M5Stack's demo repository has a
+  `flash.sh` with the esptool command for its image (`write_flash 0x0 ...bin`), which needs the C6 UART and boot pad to be
+  reachable.
+- **Old firmware without the separate activate call.** Firmware older than 2.6 switches to the new image when the transfer
+  ends. The activate call then fails, which the application logs as a warning and verifies by reading the version.
+- **A bad image.** The C6 has no rollback: an image that passes the checks but crashes leaves it in a boot loop, and only
+  its download mode brings it back.
+- **The transfer stops half way** ([FAIL] OTA write): the current firmware is untouched. Lower the clock or the chunk size.
+- Only the Tab5 was considered. The pin and power set-up in `main/tab5_power.c` and `sdkconfig.defaults` is its.
+
+## License
+
+Apache-2.0 (`LICENSE`, `NOTICE`). The rest of Retro-Go is under GPLv2, this directory is a separate program and shares
+no code with it.
