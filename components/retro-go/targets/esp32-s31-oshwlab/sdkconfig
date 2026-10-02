@@ -48,12 +48,11 @@ CONFIG_NEWLIB_NANO_FORMAT=y
 
 #
 # SPI RAM config
-# 16MB octal PSRAM at 80MHz.
-# Option names are untested on ESP32-S31, verify in `idf.py --preview menuconfig` if the build ignores them.
+# 16MB octal PSRAM. ESP32-S31 offers 250M, 200M (default), 100M or 40M, there is no 80M.
+# If the PSRAM fails to initialize or the memory test fails at boot, try CONFIG_SPIRAM_SPEED_100M=y
 #
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
-CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_BOOT_INIT=y
 CONFIG_SPIRAM_IGNORE_NOTFOUND=y
 CONFIG_SPIRAM_USE_MEMMAP=n

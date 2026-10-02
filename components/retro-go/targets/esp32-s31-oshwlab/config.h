@@ -1,5 +1,5 @@
 // Target definition
-#define RG_TARGET_NAME             "ESP32-S31-DEVKIT"
+#define RG_TARGET_NAME             "ESP32-S31_OSHWLAB"
 
 // Storage
 #define RG_STORAGE_ROOT             "/sd"

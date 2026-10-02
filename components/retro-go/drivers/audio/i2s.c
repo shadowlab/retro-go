@@ -140,7 +140,7 @@ static bool driver_set_sample_rates(int sampleRate)
     i2s_std_clk_config_t clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(sampleRate);
     if (i2s_channel_disable(tx_chan) != ESP_OK)
         return false;
-    esp_err_t ret = i2s_channel_reconfig_std_clk(tx_chan, &clk_cfg);
+    esp_err_t ret = i2s_channel_reconfig_std_clock(tx_chan, &clk_cfg);
     return i2s_channel_enable(tx_chan) == ESP_OK && ret == ESP_OK;
 #else
     return i2s_set_sample_rates(I2S_NUM_0, sampleRate) == ESP_OK;

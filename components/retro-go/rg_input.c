@@ -49,7 +49,7 @@ static rg_battery_t battery_state = {0};
     for (size_t i = 0; i < RG_COUNT(keymap); ++i) \
         gamepad_mapped |= keymap[i].key;          \
 
-#ifdef ESP_PLATFORM
+#if defined(ESP_PLATFORM) && (defined(RG_GAMEPAD_ADC_MAP) || RG_BATTERY_DRIVER == 1)
 static inline int adc_get_raw(adc_unit_t unit, adc_channel_t channel)
 {
     if (unit == ADC_UNIT_1)
