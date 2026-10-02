@@ -60,7 +60,7 @@
     {RG_KEY_OPTION, .num = GPIO_NUM_8,  .pullup = 1, .level = 0},\
 }
 
-// Battery: not defined yet (no battery sense pin provided)
+// Battery: no sensing, charging is handled by the BQ24075 (PGOOD/CHG LEDs, no ESP IOs)
 // Status LED
 #define RG_GPIO_LED                 GPIO_NUM_38
 
