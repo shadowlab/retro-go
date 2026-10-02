@@ -11,6 +11,7 @@
 
 #include "hid_parser.h"
 #include "usb_raw_pad.h"
+#include "pad_map.h"
 #if defined(RG_TARGET_M5STACK_TAB5)
 #include "drivers/board/m5stack_tab5.h"
 #endif
@@ -28,25 +29,6 @@ typedef struct
 static usb_pad_t pads[MAX_DEVICES];
 static bool started = false;
 
-// Button N of a HID gamepad (1-based). Most pads (DualShock/DualSense, Switch Pro, DInput pads from
-// 8BitDo, Logitech, Retrolink...) list west, south, east, north first, then the shoulders.
-static const uint32_t button_map[] = {
-    RG_KEY_Y,      // 1  west
-    RG_KEY_B,      // 2  south
-    RG_KEY_A,      // 3  east
-    RG_KEY_X,      // 4  north
-    RG_KEY_L,      // 5  L1
-    RG_KEY_R,      // 6  R1
-    RG_KEY_L,      // 7  L2 / ZL
-    RG_KEY_R,      // 8  R2 / ZR
-    RG_KEY_SELECT, // 9  Share / Minus / Select
-    RG_KEY_START,  // 10 Options / Plus / Start
-    0,             // 11 L3
-    0,             // 12 R3
-    RG_KEY_MENU,   // 13 PS / Home
-    RG_KEY_OPTION, // 14 Touchpad / Capture
-};
-
 uint32_t rg_usb_gamepad_translate(uint8_t dpad, uint32_t buttons)
 {
     uint32_t keys = 0;
@@ -54,12 +36,7 @@ uint32_t rg_usb_gamepad_translate(uint8_t dpad, uint32_t buttons)
     if (dpad & HID_PAD_DOWN) keys |= RG_KEY_DOWN;
     if (dpad & HID_PAD_LEFT) keys |= RG_KEY_LEFT;
     if (dpad & HID_PAD_RIGHT) keys |= RG_KEY_RIGHT;
-    for (size_t i = 0; i < RG_COUNT(button_map); ++i)
-    {
-        if (buttons & (1u << i))
-            keys |= button_map[i];
-    }
-    return keys;
+    return keys | pad_map_translate(&pad_map, buttons); // The mapping can be changed by the user, see pad_map.h
 }
 
 static uint32_t translate_keyboard(const uint8_t *r, size_t len)

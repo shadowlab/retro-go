@@ -1625,6 +1625,64 @@ static rg_gui_event_t led_indicator_cb(rg_gui_option_t *option, rg_gui_event_t e
     return RG_DIALOG_VOID;
 }
 
+#define PAD_DIALOG_MAX_ROWS 16
+
+#ifdef RG_GAMEPAD_USB_HID
+static rg_gui_event_t pad_button_cb(rg_gui_option_t *option, rg_gui_event_t event)
+{
+    const int button = (int)option->arg;
+    if (event == RG_DIALOG_PREV || event == RG_DIALOG_NEXT)
+    {
+        rg_input_pad_cycle_key(button, event == RG_DIALOG_NEXT ? 1 : -1);
+        return RG_DIALOG_REDRAW;
+    }
+    rg_key_t key = rg_input_pad_get_key(button);
+    strcpy(option->value, key ? rg_input_get_key_name(key) : _("None"));
+    return RG_DIALOG_VOID;
+}
+
+static rg_gui_event_t pad_layout_cb(rg_gui_option_t *option, rg_gui_event_t event)
+{
+    // Select the buttons that give A and B: the right one (Nintendo) or the bottom one (Xbox)
+    if (event == RG_DIALOG_PREV || event == RG_DIALOG_NEXT)
+    {
+        rg_input_pad_set_layout(rg_input_pad_get_key(1) == RG_KEY_B ? 1 : 0);
+        return RG_DIALOG_REDRAW;
+    }
+    strcpy(option->value, rg_input_pad_get_key(1) == RG_KEY_A ? "Xbox (A bottom)" : "Nintendo (A right)");
+    return RG_DIALOG_VOID;
+}
+
+static rg_gui_event_t pad_reset_cb(rg_gui_option_t *option, rg_gui_event_t event)
+{
+    if (event == RG_DIALOG_ENTER)
+    {
+        rg_input_pad_reset();
+        return RG_DIALOG_REDRAW;
+    }
+    return RG_DIALOG_VOID;
+}
+
+static rg_gui_event_t pad_buttons_cb(rg_gui_option_t *option, rg_gui_event_t event)
+{
+    if (event == RG_DIALOG_ENTER)
+    {
+        const int count = rg_input_pad_button_count();
+        rg_gui_option_t options[PAD_DIALOG_MAX_ROWS + 5] = {0};
+        int n = 0;
+        options[n++] = (rg_gui_option_t){0, _("Face buttons"), "-", RG_DIALOG_FLAG_NORMAL, &pad_layout_cb};
+        options[n++] = (rg_gui_option_t)RG_DIALOG_SEPARATOR;
+        for (int i = 0; i < count && i < PAD_DIALOG_MAX_ROWS; ++i)
+            options[n++] = (rg_gui_option_t){i, rg_input_pad_button_label(i), "-", RG_DIALOG_FLAG_NORMAL, &pad_button_cb};
+        options[n++] = (rg_gui_option_t)RG_DIALOG_SEPARATOR;
+        options[n++] = (rg_gui_option_t){0, _("Reset to defaults"), NULL, RG_DIALOG_FLAG_NORMAL, &pad_reset_cb};
+        options[n++] = (rg_gui_option_t)RG_DIALOG_END;
+        rg_gui_dialog(option->label, options, 0);
+    }
+    return RG_DIALOG_VOID;
+}
+#endif
+
 #ifdef RG_GAMEPAD_BLE_HID
 static rg_gui_event_t bt_pads_cb(rg_gui_option_t *option, rg_gui_event_t event)
 {
@@ -2052,6 +2110,9 @@ void rg_gui_options_menu(void)
         #endif
         #ifdef RG_ENABLE_NETWORKING
         {0, _("Wi-Fi options"), NULL, RG_DIALOG_FLAG_NORMAL, &wifi_cb},
+        #endif
+        #ifdef RG_GAMEPAD_USB_HID
+        {0, _("Controller buttons"), NULL, RG_DIALOG_FLAG_NORMAL, &pad_buttons_cb},
         #endif
         #ifdef RG_GAMEPAD_BLE_HID
         {0, _("Bluetooth pads"), "-", RG_DIALOG_FLAG_NORMAL, &bt_pads_cb},

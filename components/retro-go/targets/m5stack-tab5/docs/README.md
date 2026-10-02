@@ -44,7 +44,16 @@ The Tab5 has no hardware buttons, so input is USB or touch only. Plug a gamepad 
 ### USB gamepad button layout
 
 Button 1-4 (west, south, east, north on most pads) map to Y, B, A, X, 5/6 and 7/8 to L/R, 9 to Select, 10 to Start,
-13 to Menu, 14 to Option. This matches DualShock 4, DualSense and most DInput pads. There is no remapping UI yet.
+13 to Menu, 14 to Option. This matches DualShock 4, DualSense and most DInput pads.
+
+### Button mapping
+
+Launcher > Options > *Controller buttons* changes what each button of an external controller (USB or Bluetooth, the
+d-pad excepted) does. *Face buttons* switches between the positional layout above (the right button is A, as on Nintendo
+pads) and the Xbox one (the bottom button is A). Every other row cycles the button through none, A, B, X, Y, L, R, Select, Start,
+Menu and Option with left/right, several buttons can do the same thing. Only the entries that were changed are stored
+(`PadMap0`..`PadMap13` in the global settings, shared by all apps), *Reset to defaults* deletes them. The mapping
+logic is `drivers/input/pad_map.c` (host-tested). The USB keyboard keys are fixed.
 
 ### Pads without a standard HID report (`usb_raw_pad.c`)
 

@@ -14,6 +14,9 @@
 #ifdef RG_GAMEPAD_BLE_HID
 #include "drivers/input/ble_hid_pad.h"
 #endif
+#ifdef RG_GAMEPAD_USB_HID
+#include "drivers/input/pad_map.h"
+#endif
 
 #ifdef ESP_PLATFORM
 #include <driver/gpio.h>
@@ -54,6 +57,9 @@ static bool input_task_running = false;
 static uint32_t gamepad_state = -1; // _Atomic
 static uint32_t gamepad_mapped = 0;
 static rg_battery_t battery_state = {0};
+#ifdef RG_GAMEPAD_USB_HID
+static void pad_map_load(void);
+#endif
 
 #define UPDATE_GLOBAL_MAP(keymap)                 \
     for (size_t i = 0; i < RG_COUNT(keymap); ++i) \
@@ -393,6 +399,7 @@ void rg_input_init(void)
 #endif
 
 #if defined(RG_GAMEPAD_USB_HID)
+    pad_map_load();
     RG_LOGI("Initializing USB HID gamepad driver...");
     rg_usb_gamepad_init();
     gamepad_mapped |= RG_KEY_ALL & ((1 << RG_KEY_COUNT) - 1);
@@ -423,6 +430,90 @@ void rg_input_deinit(void)
     // while (gamepad_state != -1)
     //     rg_task_yield();
     RG_LOGI("Input terminated.\n");
+}
+
+// Button mapping of external controllers (USB, Bluetooth). Stored as "PadMap<N>" settings, only when changed.
+#ifdef RG_GAMEPAD_USB_HID
+static void pad_map_load(void)
+{
+    char key[16];
+    for (int i = 0; i < PAD_MAP_BUTTONS; ++i)
+    {
+        snprintf(key, sizeof(key), "PadMap%d", i);
+        double value = rg_settings_get_number(NS_GLOBAL, key, -1);
+        if (value >= 0 && pad_map_key_is_valid((uint32_t)value))
+            pad_map.keys[i] = (uint32_t)value;
+    }
+}
+
+static void pad_map_save(int button)
+{
+    char key[16];
+    snprintf(key, sizeof(key), "PadMap%d", button);
+    rg_settings_set_number(NS_GLOBAL, key, pad_map.keys[button]);
+}
+#endif
+
+int rg_input_pad_button_count(void)
+{
+#ifdef RG_GAMEPAD_USB_HID
+    return PAD_MAP_BUTTONS;
+#else
+    return 0;
+#endif
+}
+
+const char *rg_input_pad_button_label(int button)
+{
+#ifdef RG_GAMEPAD_USB_HID
+    return pad_map_button_label(button);
+#else
+    return "";
+#endif
+}
+
+rg_key_t rg_input_pad_get_key(int button)
+{
+#ifdef RG_GAMEPAD_USB_HID
+    return (button >= 0 && button < PAD_MAP_BUTTONS) ? pad_map.keys[button] : 0;
+#else
+    return 0;
+#endif
+}
+
+void rg_input_pad_cycle_key(int button, int direction)
+{
+#ifdef RG_GAMEPAD_USB_HID
+    if (button < 0 || button >= PAD_MAP_BUTTONS)
+        return;
+    pad_map.keys[button] = pad_map_next_key(pad_map.keys[button], direction);
+    pad_map_save(button);
+    rg_settings_commit();
+#endif
+}
+
+void rg_input_pad_set_layout(int layout)
+{
+#ifdef RG_GAMEPAD_USB_HID
+    pad_map_set_layout(&pad_map, layout);
+    for (int i = 0; i < 4; ++i) // Only the face buttons depend on the layout
+        pad_map_save(i);
+    rg_settings_commit();
+#endif
+}
+
+void rg_input_pad_reset(void)
+{
+#ifdef RG_GAMEPAD_USB_HID
+    char key[16];
+    pad_map_defaults(&pad_map);
+    for (int i = 0; i < PAD_MAP_BUTTONS; ++i)
+    {
+        snprintf(key, sizeof(key), "PadMap%d", i);
+        rg_settings_delete(NS_GLOBAL, key);
+    }
+    rg_settings_commit();
+#endif
 }
 
 // Bluetooth controllers: 0 = off, 1 = on, 2 = pair a new controller

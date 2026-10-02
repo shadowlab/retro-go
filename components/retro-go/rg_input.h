@@ -95,6 +95,16 @@ void rg_input_deinit(void);
 void rg_input_touch_ui_enter(void);
 void rg_input_touch_ui_leave(void);
 bool rg_input_touch_ui_active(void);
+// Button mapping of external controllers (targets with RG_GAMEPAD_USB_HID). Buttons are numbered from 0 in the order of
+// rg_input_pad_button_label(), the key is 0 when a button does nothing. Changes are saved. Layout 0 = positional
+// (Nintendo), 1 = Xbox labels.
+int rg_input_pad_button_count(void); // 0 if the target has no external controllers
+const char *rg_input_pad_button_label(int button);
+rg_key_t rg_input_pad_get_key(int button);
+void rg_input_pad_cycle_key(int button, int direction);
+void rg_input_pad_set_layout(int layout);
+void rg_input_pad_reset(void);
+
 // Bluetooth LE controllers (targets with RG_GAMEPAD_BLE_HID): mode 0 = off, 1 = on, 2 = pairing
 int rg_input_bt_get_mode(void);
 void rg_input_bt_set_mode(int mode);
