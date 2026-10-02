@@ -48,7 +48,7 @@ CONFIG_NEWLIB_NANO_FORMAT=y
 
 #
 # SPI RAM config
-# 16MB octal PSRAM. ESP32-S31 offers 250M, 200M (default), 100M or 40M, there is no 80M.
+# 16MB octal PSRAM (module max clock 200MHz). ESP32-S31 offers 250M, 200M (default), 100M or 40M, there is no 80M.
 # If the PSRAM fails to initialize or the memory test fails at boot, try CONFIG_SPIRAM_SPEED_100M=y
 #
 CONFIG_SPIRAM=y

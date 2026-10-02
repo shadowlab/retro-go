@@ -47,7 +47,10 @@
 // Pin notes (ESP32-S31 datasheet v0.5, section 2.3.4): none of the pins below are strapping (GPIO36/37/60/61),
 // USB Serial/JTAG (GPIO33/34), JTAG (GPIO54-57), UART0 (GPIO58/59) or flash (GPIO26-28/30-32) pins.
 // GPIO1 is shared with the 32kHz crystal pin (XTAL_32K_P), so no 32kHz crystal can be fitted on this board.
-// GPIO1-18 are powered by VDDPST_1, GPIO38-48 by VDDPST_3, GPIO20-25 (SD) by the internal VDDPST_SD domain.
+// Module: ESP32-S31-WROOM-3U-N16R16V (16MB quad SPI flash, 16MB octal PSRAM), datasheet v0.7. It has one 3V3 supply
+// (pins 3, 4: 3.0-3.6V, supply must deliver at least 0.6A) and exposes every GPIO used here. The chip's VDDPST_x/VDDA
+// rails, including the SD domain source (VDDPST_2), are inside the module, so nothing needs to be wired for them.
+// The module labels the SD pins SD_D0-SD_D3/SD_CLK/SD_CMD (module pins 27-32, GPIO20-25).
 
 // Input
 // Refer to rg_input.h to see all available RG_KEY_* and RG_GAMEPAD_*_MAP types
