@@ -1,4 +1,4 @@
-set(COMPONENT_SRCDIRS ". drivers/audio fonts libs/netplay libs/lodepng")
+set(COMPONENT_SRCDIRS ". drivers/audio drivers/board fonts libs/netplay libs/lodepng")
 set(COMPONENT_ADD_INCLUDEDIRS ". libs/netplay libs/lodepng")
 if(IDF_VERSION_MAJOR GREATER 5) # cJSON was removed from esp-idf 6.0 core, use the bundled copy
     list(APPEND COMPONENT_SRCDIRS "libs/cJSON")

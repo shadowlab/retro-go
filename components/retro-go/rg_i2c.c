@@ -2,14 +2,152 @@
 #include "rg_i2c.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(ESP_PLATFORM) && defined(RG_GPIO_I2C_SDA) && defined(RG_GPIO_I2C_SCL)
-#include <driver/i2c.h>
+#include <esp_idf_version.h>
 #include <esp_err.h>
+// The legacy driver cannot be mixed with the new one (used by esp_lcd_touch, esp_codec_dev, ...) so targets that need
+// those, and esp-idf 6.0+ (where the legacy driver is deprecated), use the new master driver.
+#if defined(RG_I2C_USE_MASTER_DRIVER) || ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+#include <driver/i2c_master.h>
+#define USE_I2C_MASTER_DRIVER 1
+#else
+#include <driver/i2c.h>
+#endif
 #define USE_I2C_DRIVER 1
 #endif
 
 static bool i2c_initialized = false;
+
+#ifdef USE_I2C_MASTER_DRIVER
+
+#define I2C_SPEED_HZ 400000
+#define I2C_TIMEOUT_MS 500
+#define I2C_MAX_DEVICES 8
+
+static i2c_master_bus_handle_t i2c_bus;
+static struct {uint8_t addr; i2c_master_dev_handle_t handle;} i2c_devices[I2C_MAX_DEVICES];
+static int i2c_devices_count;
+
+// The master driver needs a handle per device, they are created on first use
+static i2c_master_dev_handle_t get_device(uint8_t addr)
+{
+    for (int i = 0; i < i2c_devices_count; ++i)
+    {
+        if (i2c_devices[i].addr == addr)
+            return i2c_devices[i].handle;
+    }
+    if (i2c_devices_count >= I2C_MAX_DEVICES)
+        return NULL;
+    const i2c_device_config_t config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = addr,
+        .scl_speed_hz = I2C_SPEED_HZ,
+    };
+    i2c_master_dev_handle_t handle;
+    if (i2c_master_bus_add_device(i2c_bus, &config, &handle) != ESP_OK)
+        return NULL;
+    i2c_devices[i2c_devices_count].addr = addr;
+    i2c_devices[i2c_devices_count].handle = handle;
+    i2c_devices_count++;
+    return handle;
+}
+
+void *rg_i2c_get_bus_handle(void)
+{
+    return i2c_initialized ? i2c_bus : NULL;
+}
+
+bool rg_i2c_init(void)
+{
+    if (i2c_initialized)
+        return true;
+    const i2c_master_bus_config_t config = {
+        .i2c_port = I2C_NUM_0,
+        .sda_io_num = RG_GPIO_I2C_SDA,
+        .scl_io_num = RG_GPIO_I2C_SCL,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+    esp_err_t err = i2c_new_master_bus(&config, &i2c_bus);
+    if (err != ESP_OK)
+    {
+        RG_LOGE("Failed to initialize I2C driver. err=0x%x\n", err);
+        return false;
+    }
+    RG_LOGI("I2C driver ready (SDA:%d SCL:%d).\n", RG_GPIO_I2C_SDA, RG_GPIO_I2C_SCL);
+    i2c_initialized = true;
+    return true;
+}
+
+bool rg_i2c_deinit(void)
+{
+    if (!i2c_initialized)
+        return true;
+    for (int i = 0; i < i2c_devices_count; ++i)
+        i2c_master_bus_rm_device(i2c_devices[i].handle);
+    i2c_devices_count = 0;
+    if (i2c_del_master_bus(i2c_bus) == ESP_OK)
+        RG_LOGI("I2C driver terminated.\n");
+    i2c_initialized = false;
+    return true;
+}
+
+bool rg_i2c_read(uint8_t addr, int reg, void *read_data, size_t read_len)
+{
+    i2c_master_dev_handle_t dev = i2c_initialized ? get_device(addr) : NULL;
+    esp_err_t err = ESP_FAIL;
+    if (dev)
+    {
+        if (reg >= 0)
+        {
+            const uint8_t reg8 = (uint8_t)reg;
+            err = i2c_master_transmit_receive(dev, &reg8, 1, read_data, read_len, I2C_TIMEOUT_MS);
+        }
+        else
+        {
+            err = i2c_master_receive(dev, read_data, read_len, I2C_TIMEOUT_MS);
+        }
+    }
+    if (err != ESP_OK)
+        RG_LOGE("Read from 0x%02X failed. reg=0x%02X, err=0x%03X, init=%d\n", addr, reg, err, i2c_initialized);
+    return err == ESP_OK;
+}
+
+bool rg_i2c_write(uint8_t addr, int reg, const void *write_data, size_t write_len)
+{
+    i2c_master_dev_handle_t dev = i2c_initialized ? get_device(addr) : NULL;
+    esp_err_t err = ESP_FAIL;
+    if (dev)
+    {
+        // The register is sent in the same transaction, as the first byte
+        size_t offset = (reg >= 0) ? 1 : 0;
+        uint8_t stack_buffer[32];
+        uint8_t *buffer = write_len + offset <= sizeof(stack_buffer) ? stack_buffer : malloc(write_len + offset);
+        if (buffer)
+        {
+            if (offset)
+                buffer[0] = (uint8_t)reg;
+            if (write_len)
+                memcpy(buffer + offset, write_data, write_len);
+            err = i2c_master_transmit(dev, buffer, write_len + offset, I2C_TIMEOUT_MS);
+            if (buffer != stack_buffer)
+                free(buffer);
+        }
+    }
+    if (err != ESP_OK)
+        RG_LOGE("Write to 0x%02X failed. reg=0x%02X, err=0x%03X, init=%d\n", addr, reg, err, i2c_initialized);
+    return err == ESP_OK;
+}
+
+#else // legacy driver
+
+void *rg_i2c_get_bus_handle(void)
+{
+    return NULL;
+}
 
 #define TRY(x)                 \
     if ((err = (x)) != ESP_OK) \
@@ -113,6 +251,8 @@ fail:
 #endif
     return false;
 }
+
+#endif // USE_I2C_MASTER_DRIVER
 
 int rg_i2c_read_byte(uint8_t addr, uint8_t reg)
 {

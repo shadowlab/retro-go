@@ -1,11 +1,21 @@
 // Target definition
 #define RG_TARGET_NAME             "M5STACK-TAB5"
 
+// Board initialization (I2C bus, IO expanders, charging), called very early by rg_system_init()
+void rg_tab5_init(void);
+#define RG_TARGET_INIT()            rg_tab5_init()
+
+// I2C (system bus: IO expanders, codecs, touch, battery monitor, RTC, IMU)
+#define RG_GPIO_I2C_SDA             GPIO_NUM_31
+#define RG_GPIO_I2C_SCL             GPIO_NUM_32
+#define RG_I2C_USE_MASTER_DRIVER    1   // The touch and codec drivers need the new i2c master driver
+
 // Storage
 #define RG_STORAGE_ROOT             "/sd"
 #define RG_STORAGE_SDMMC_HOST       SDMMC_HOST_SLOT_0
 #define RG_STORAGE_SDMMC_SPEED      SDMMC_FREQ_HIGHSPEED
 #define RG_STORAGE_SDMMC_WIDTH      4
+#define RG_STORAGE_SDMMC_LDO_CHAN   4   // LDO_VO4 powers the SDMMC IO on the Tab5
 
 // Audio
 #define RG_AUDIO_USE_INT_DAC        0   // 0 = Disable, 1 = GPIO25, 2 = GPIO26, 3 = Both
