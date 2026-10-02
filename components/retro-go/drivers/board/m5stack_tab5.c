@@ -143,8 +143,6 @@ bool rg_tab5_headphones_detected(void)
     return value >= 0 && (value & EXP1_HP_DETECT);
 }
 
-#endif
-
 bool rg_tab5_wifi_prepare(void)
 {
 #ifdef RG_ENABLE_NETWORKING
@@ -166,3 +164,5 @@ bool rg_tab5_wifi_prepare(void)
     return false;
 #endif
 }
+
+#endif // RG_TARGET_M5STACK_TAB5
