@@ -20,8 +20,10 @@ void rg_tab5_init(void);
 // Audio
 #define RG_AUDIO_USE_INT_DAC        0   // 0 = Disable, 1 = GPIO25, 2 = GPIO26, 3 = Both
 #define RG_AUDIO_USE_EXT_DAC        1   // 0 = Disable, 1 = Enable
+#define RG_AUDIO_CODEC_ES8388       1
+#define RG_GPIO_SND_I2S_MCLK        GPIO_NUM_30
 
-// Video (placeholder, replaced by the MIPI-DSI driver)
+// Video (MIPI-DSI, see drivers/display/mipi_dsi.h)
 #define RG_GAMEPAD_USB_HID          1
 #define RG_TOUCH_ST712X             1
 #define RG_SCREEN_DRIVER            2
