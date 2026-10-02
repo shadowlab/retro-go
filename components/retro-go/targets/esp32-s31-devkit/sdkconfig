@@ -40,9 +40,11 @@ CONFIG_NEWLIB_NANO_FORMAT=y
 
 #
 # SPI RAM config
-# TODO: set PSRAM type/speed/pins for the ESP32-S31 board once known (idf.py --preview menuconfig)
+# 16MB octal PSRAM. Speed is left at the esp-idf default until the right value is confirmed,
+# check "SPI RAM config" in `idf.py --preview menuconfig` for the speeds available on ESP32-S31.
 #
 CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_BOOT_INIT=y
 CONFIG_SPIRAM_IGNORE_NOTFOUND=y
 CONFIG_SPIRAM_USE_MEMMAP=n
