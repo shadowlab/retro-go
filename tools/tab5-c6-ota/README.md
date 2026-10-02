@@ -10,6 +10,16 @@ lboshuizen, which does the same for the Elecrow CrowPanel 7" (see `NOTICE`).
 
 **Status: it builds (ESP-IDF 6.1). It has not been run on a Tab5.**
 
+## Workflow: a separate application, flashed on its own
+
+This is its own firmware image, not a part of Retro-Go and not bundled with it: nothing here is linked into, or added to, the
+Retro-Go build, and the Retro-Go package doesn't contain a C6 image. The order is:
+
+1. Build and flash **this application** to the Tab5 (P4) by itself.
+2. Let it run until the log says the C6 reports the new version (`[PASS]`). The C6 keeps that firmware in its own flash.
+3. Flash the **Retro-Go** firmware package over it as usual. This application is then gone from the P4 and isn't needed again
+   unless the C6 firmware has to change.
+
 ## Why
 
 The Tab5 ships with a C6 running ESP-Hosted slave firmware 1.4.1 (`ESP32C6-WiFi-SDIO-Interface-V1.4.1`, the file in
@@ -105,7 +115,7 @@ idf.py build                     # fails with a message if firmware/network_adap
 idf.py -p <serial port> flash monitor
 ```
 
-This replaces the firmware of the P4 (flash your normal firmware, for example Retro-Go, again afterwards). The C6 keeps its new
+This replaces the firmware of the P4 (flash your normal firmware, for example the Retro-Go package, over it afterwards). The C6 keeps its new
 firmware, it has its own flash. Running the application again is safe: it reports that the C6 already is at the version
 of the host.
 
