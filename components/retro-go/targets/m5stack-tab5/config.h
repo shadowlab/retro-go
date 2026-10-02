@@ -1,4 +1,5 @@
 // Target definition
+#include <time.h>
 #define RG_TARGET_NAME             "M5STACK-TAB5"
 
 // Board initialization (I2C bus, IO expanders, charging), called very early by rg_system_init()
@@ -6,6 +7,11 @@ void rg_tab5_init(void);
 #define RG_TARGET_INIT()            rg_tab5_init()
 bool rg_tab5_wifi_prepare(void);
 #define RG_TARGET_NETWORK_PREPARE() rg_tab5_wifi_prepare()
+// Real time clock (see rg_system_load_time/rg_system_save_time), the time is UTC
+bool rg_tab5_rtc_read(time_t *utc);
+bool rg_tab5_rtc_write(time_t utc);
+#define RG_TARGET_RTC_READ(utc)     rg_tab5_rtc_read(utc)
+#define RG_TARGET_RTC_WRITE(utc)    rg_tab5_rtc_write(utc)
 
 // I2C (system bus: IO expanders, codecs, touch, battery monitor, RTC, IMU)
 #define RG_GPIO_I2C_SDA             GPIO_NUM_31

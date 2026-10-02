@@ -763,19 +763,21 @@ bool rg_mutex_take(rg_mutex_t *mutex, int timeoutMS)
 void rg_system_load_time(void)
 {
     time_t time_sec = RG_MAX(rtcValue, RG_BUILD_TIME);
-#if 0
-    if (rg_i2c_read(0x68, 0x00, data, sizeof(data)))
-    {
-        RG_LOGI("Time loaded from DS3231\n");
-    }
-    else
-#endif
     void *data_ptr = (void *)&time_sec;
     size_t data_len = sizeof(time_sec);
     if (rg_storage_read_file(RG_BASE_PATH_CACHE "/clock.bin", &data_ptr, &data_len, RG_FILE_USER_BUFFER))
     {
         RG_LOGI("Time loaded from storage\n");
     }
+#ifdef RG_TARGET_RTC_READ
+    // A battery backed clock is more accurate than the file, which is only updated when we get to save it
+    time_t rtc_time;
+    if (RG_TARGET_RTC_READ(&rtc_time) && rtc_time >= RG_BUILD_TIME)
+    {
+        RG_LOGI("Time loaded from RTC\n");
+        time_sec = rtc_time;
+    }
+#endif
 #ifdef ESP_PLATFORM
     settimeofday(&(struct timeval){time_sec, 0}, NULL);
 #endif
@@ -791,10 +793,10 @@ void rg_system_save_time(void)
     {
         RG_LOGI("System time saved to storage.\n");
     }
-#if 0
-    if (rg_i2c_write(0x68, 0x00, data, sizeof(data)))
+#ifdef RG_TARGET_RTC_WRITE
+    if (RG_TARGET_RTC_WRITE(time_sec))
     {
-        RG_LOGI("System time saved to DS3231.\n");
+        RG_LOGI("System time saved to RTC.\n");
     }
 #endif
 }

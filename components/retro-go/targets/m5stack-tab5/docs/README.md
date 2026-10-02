@@ -33,6 +33,7 @@ Requirements and caveats:
 | USB gamepads | USB-A host (5 V from the IO expander). HID gamepads/joysticks and boot keyboards, hot-plug, up to 4 devices merged. `drivers/input/usb_gamepad.c` |
 | Audio | ES8388 codec over I2S (MCLK on GPIO30), configured through `esp_codec_dev`. Volume is done in software |
 | Wi-Fi | ESP32-C6 co-processor through ESP-Hosted (SDIO, SDMMC slot 1, reset on GPIO15), see below |
+| RTC | RX8130 (I2C 0x32), holds UTC. Read at boot by `rg_system_load_time()` (overrides the saved clock file when valid), written by `rg_system_save_time()`, which the system calls when the time jumps, for example after an NTP sync. Invalid after a power loss (VLF flag) until set again. The backup battery charging is enabled like in M5Stack's firmware. `drivers/board/rx8130.c` |
 | Storage | SD card, SDMMC slot 0, 4-bit, powered from on-chip LDO channel 4 |
 | IO expanders | Two PI4IOE5V6408 (0x43, 0x44): LCD/touch reset, speaker amp, USB 5 V, charging, Wi-Fi power. `drivers/board/m5stack_tab5.c` |
 
@@ -100,5 +101,5 @@ most promising change if a core turns out to be too slow, most likely snes9x.
 
 ## Not done
 
-Battery gauge (INA226), RTC (RX8130), microphone (ES7210), Bluetooth through the C6, touch in the on-screen
+Battery gauge (INA226), microphone (ES7210), Bluetooth through the C6, touch in the on-screen
 keyboard, and a tap-on-row menu selection.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <time.h>
 
 // Board support for the M5Stack Tab5 (ESP32-P4). The pin meanings come from M5Stack's official BSP
 // (https://github.com/m5stack/M5Tab5-UserDemo, platforms/tab5/components/m5stack_tab5).
@@ -21,3 +22,7 @@ bool rg_tab5_wifi_prepare(void);
 void rg_tab5_set_usb_5v(bool enable);
 void rg_tab5_set_charging(bool enable);
 bool rg_tab5_headphones_detected(void);
+
+// RX8130 real time clock, stores UTC. Read fails if the chip is missing or lost power (time invalid).
+bool rg_tab5_rtc_read(time_t *utc);
+bool rg_tab5_rtc_write(time_t utc);

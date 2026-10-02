@@ -4,6 +4,7 @@
 #if defined(RG_TARGET_M5STACK_TAB5)
 
 #include "m5stack_tab5.h"
+#include "rx8130.h"
 
 #include <driver/gpio.h>
 #ifdef RG_ENABLE_NETWORKING
@@ -141,6 +142,48 @@ bool rg_tab5_headphones_detected(void)
 {
     int value = rg_i2c_read_byte(EXPANDER1_ADDR, REG_IN_STA);
     return value >= 0 && (value & EXP1_HP_DETECT);
+}
+
+bool rg_tab5_rtc_read(time_t *utc)
+{
+    static bool battery_init = false;
+    if (!battery_init)
+    {
+        // Charge the RTC backup battery, as M5Stack's own firmware does
+        int ctrl1 = rg_i2c_read_byte(RX8130_ADDR, RX8130_REG_CTRL1);
+        if (ctrl1 >= 0)
+            rg_i2c_write_byte(RX8130_ADDR, RX8130_REG_CTRL1, ctrl1 | RX8130_CTRL1_INIEN | RX8130_CTRL1_CHGEN);
+        battery_init = true;
+    }
+
+    int flag = rg_i2c_read_byte(RX8130_ADDR, RX8130_REG_FLAG);
+    uint8_t regs[7];
+    if (flag < 0 || !rg_i2c_read(RX8130_ADDR, RX8130_REG_SEC, regs, sizeof(regs)))
+        return false; // Not there
+    if (flag & RX8130_FLAG_VLF)
+    {
+        RG_LOGW("RTC lost power, its time is invalid");
+        return false;
+    }
+    return rx8130_decode(regs, utc);
+}
+
+bool rg_tab5_rtc_write(time_t utc)
+{
+    uint8_t regs[7];
+    rx8130_encode(utc, regs);
+
+    // The clock has to be stopped while the calendar is written
+    int ctrl0 = rg_i2c_read_byte(RX8130_ADDR, RX8130_REG_CTRL0);
+    int flag = rg_i2c_read_byte(RX8130_ADDR, RX8130_REG_FLAG);
+    if (ctrl0 < 0 || flag < 0)
+        return false;
+    bool ok = rg_i2c_write_byte(RX8130_ADDR, RX8130_REG_CTRL0, ctrl0 | RX8130_CTRL0_STOP)
+              && rg_i2c_write(RX8130_ADDR, RX8130_REG_SEC, regs, sizeof(regs));
+    ok = rg_i2c_write_byte(RX8130_ADDR, RX8130_REG_CTRL0, ctrl0 & ~RX8130_CTRL0_STOP) && ok;
+    if (ok && (flag & RX8130_FLAG_VLF))
+        rg_i2c_write_byte(RX8130_ADDR, RX8130_REG_FLAG, flag & ~RX8130_FLAG_VLF); // The time is valid again
+    return ok;
 }
 
 bool rg_tab5_wifi_prepare(void)
