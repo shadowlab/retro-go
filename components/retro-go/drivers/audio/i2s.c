@@ -10,7 +10,15 @@
 #endif
 
 #include <driver/gpio.h>
+#include <esp_idf_version.h>
+
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+#include <driver/i2s_std.h>
+#define USE_NEW_I2S_DRIVER 1 // The legacy driver/i2s.h was removed in esp-idf 6.0
+static i2s_chan_handle_t tx_chan;
+#else
 #include <driver/i2s.h>
+#endif
 
 #ifdef RG_GPIO_SND_AMP_ENABLE_INVERT
 #define MUTE_ENABLE 1
@@ -40,7 +48,9 @@ static bool driver_init(int device, int sample_rate)
 
     if (state.device == 0)
     {
-    #if RG_AUDIO_USE_INT_DAC
+    #if RG_AUDIO_USE_INT_DAC && USE_NEW_I2S_DRIVER
+        state.last_error = "Internal DAC mode is not supported with esp-idf 6.0+!";
+    #elif RG_AUDIO_USE_INT_DAC
         esp_err_t ret = i2s_driver_install(I2S_NUM_0, &(i2s_config_t){
             .mode = I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN,
             .sample_rate = sample_rate,
@@ -62,6 +72,30 @@ static bool driver_init(int device, int sample_rate)
     else if (state.device == 1)
     {
     #if RG_AUDIO_USE_EXT_DAC
+    #if USE_NEW_I2S_DRIVER
+        i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
+        chan_cfg.dma_desc_num = DMA_BUFFER_COUNT;
+        chan_cfg.dma_frame_num = DMA_BUFFER_LEN;
+        chan_cfg.auto_clear = true;
+        esp_err_t ret = i2s_new_channel(&chan_cfg, &tx_chan, NULL);
+        if (ret == ESP_OK)
+        {
+            i2s_std_config_t std_cfg = {
+                .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(sample_rate),
+                .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
+                .gpio_cfg = {
+                    .mclk = I2S_GPIO_UNUSED,
+                    .bclk = RG_GPIO_SND_I2S_BCK,
+                    .ws = RG_GPIO_SND_I2S_WS,
+                    .dout = RG_GPIO_SND_I2S_DATA,
+                    .din = I2S_GPIO_UNUSED,
+                },
+            };
+            ret = i2s_channel_init_std_mode(tx_chan, &std_cfg);
+            if (ret == ESP_OK)
+                ret = i2s_channel_enable(tx_chan);
+        }
+    #else
         esp_err_t ret = i2s_driver_install(I2S_NUM_0, &(i2s_config_t){
             .mode = I2S_MODE_MASTER | I2S_MODE_TX,
             .sample_rate = sample_rate,
@@ -85,6 +119,7 @@ static bool driver_init(int device, int sample_rate)
                 .data_in_num = GPIO_NUM_NC
             });
         }
+    #endif
         if (ret != ESP_OK)
             state.last_error = esp_err_to_name(ret);
     #else
@@ -101,15 +136,32 @@ static bool driver_init(int device, int sample_rate)
 
 static bool driver_set_sample_rates(int sampleRate)
 {
+#if USE_NEW_I2S_DRIVER
+    i2s_std_clk_config_t clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(sampleRate);
+    if (i2s_channel_disable(tx_chan) != ESP_OK)
+        return false;
+    esp_err_t ret = i2s_channel_reconfig_std_clock(tx_chan, &clk_cfg);
+    return i2s_channel_enable(tx_chan) == ESP_OK && ret == ESP_OK;
+#else
     return i2s_set_sample_rates(I2S_NUM_0, sampleRate) == ESP_OK;
+#endif
 }
 
 static bool driver_deinit(void)
 {
+#if USE_NEW_I2S_DRIVER
+    if (tx_chan)
+    {
+        i2s_channel_disable(tx_chan);
+        i2s_del_channel(tx_chan);
+        tx_chan = NULL;
+    }
+#else
     i2s_driver_uninstall(I2S_NUM_0);
+#endif
     if (state.device == 0)
     {
-    #if RG_AUDIO_USE_INT_DAC
+    #if RG_AUDIO_USE_INT_DAC && !USE_NEW_I2S_DRIVER
         i2s_set_dac_mode(I2S_DAC_CHANNEL_DISABLE);
     #endif
     }
@@ -179,7 +231,11 @@ static bool driver_submit(const rg_audio_frame_t *frames, size_t count)
         if (i == count - 1 || ++pos == RG_COUNT(buffer))
         {
             size_t written;
+        #if USE_NEW_I2S_DRIVER
+            if (i2s_channel_write(tx_chan, (void *)buffer, pos * 4, &written, 1000) != ESP_OK)
+        #else
             if (i2s_write(I2S_NUM_0, (void *)buffer, pos * 4, &written, 1000) != ESP_OK)
+        #endif
                 RG_LOGW("I2S Submission error! Written: %d/%d\n", written, pos * 4);
             pos = 0;
         }
@@ -189,7 +245,13 @@ static bool driver_submit(const rg_audio_frame_t *frames, size_t count)
 
 static bool driver_set_mute(bool mute)
 {
+#if USE_NEW_I2S_DRIVER
+    // No zero_dma_buffer in the new driver, restarting the channel clears the buffers (auto_clear)
+    i2s_channel_disable(tx_chan);
+    i2s_channel_enable(tx_chan);
+#else
     i2s_zero_dma_buffer(I2S_NUM_0);
+#endif
     #ifdef RG_GPIO_SND_AMP_ENABLE
     gpio_set_level(RG_GPIO_SND_AMP_ENABLE, mute ? MUTE_ENABLE : MUTE_DISABLE);
     #endif

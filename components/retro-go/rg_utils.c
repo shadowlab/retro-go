@@ -428,7 +428,9 @@ void *rg_alloc(size_t size, uint32_t caps)
     uint32_t esp_caps = 0;
     esp_caps |= (caps & MEM_SLOW ? MALLOC_CAP_SPIRAM : (caps & MEM_FAST ? MALLOC_CAP_INTERNAL : 0));
     esp_caps |= (caps & MEM_DMA ? MALLOC_CAP_DMA : 0);
+#ifdef MALLOC_CAP_EXEC // Only defined if the chip has an executable heap (CONFIG_HEAP_HAS_EXEC_HEAP)
     esp_caps |= (caps & MEM_EXEC ? MALLOC_CAP_EXEC : 0);
+#endif
     esp_caps |= (caps & MEM_32BIT ? MALLOC_CAP_32BIT : MALLOC_CAP_8BIT);
 
     if (!(ptr = heap_caps_calloc(1, size, esp_caps)))

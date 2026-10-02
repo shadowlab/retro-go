@@ -45,7 +45,7 @@ typedef struct
 typedef struct
 {
     int32_t totalFrames, fullFrames, partFrames, ticks;
-    int64_t busyTime, updateTime;
+    int64_t busyTime, displayBusyTime, updateTime;
 } counters_t;
 
 struct rg_task_s
@@ -187,6 +187,7 @@ static void update_statistics(void)
     counters.fullFrames = display.fullFrames;
     counters.partFrames = display.partFrames;
     counters.busyTime = statistics.busyTime;
+    counters.displayBusyTime = display.busyTime;
     counters.ticks = statistics.ticks;
     counters.updateTime = statistics.lastTick;
 
@@ -201,6 +202,7 @@ static void update_statistics(void)
         float totalTime = counters.updateTime - previous.updateTime;
         float totalTimeSecs = totalTime / usPerSecond;
         float busyTime = counters.busyTime - previous.busyTime;
+        float displayBusyTime = counters.displayBusyTime - previous.displayBusyTime;
         float ticks = counters.ticks - previous.ticks;
         float fullFrames = counters.fullFrames - previous.fullFrames;
         float partFrames = counters.partFrames - previous.partFrames;
@@ -214,6 +216,7 @@ static void update_statistics(void)
         statistics.fullFPS = fullFrames / totalTimeSecs;
         statistics.partialFPS = partFrames / totalTimeSecs;
         statistics.busyPercent = busyTime / totalTime * 100.f;
+        statistics.displayBusyPercent = displayBusyTime / totalTime * 100.f;
         statistics.speedPercent = app.tickRate > 0 ? (statistics.totalFPS / app.tickRate * 100.f) : 100.f;
     }
     statistics.uptime = rg_system_timer() / 1000000;
@@ -262,13 +265,14 @@ static void system_monitor_task(void *arg)
         update_indicators(false);
 
         // Try to avoid complex conversions that could allocate, prefer rounding/ceiling if necessary.
-        rg_system_log(RG_LOG_DEBUG, NULL, "STACK:%d, HEAP:%d+%d (%d+%d), BUSY:%d%%, FPS:%d (S:%d R:%d+%d), BATT:%d",
+        rg_system_log(RG_LOG_DEBUG, NULL, "STACK:%d, HEAP:%d+%d (%d+%d), BUSY:%d%%, DISP:%d%%, FPS:%d (S:%d R:%d+%d), BATT:%d",
             statistics.freeStackMain,
             statistics.freeMemoryInt / 1024,
             statistics.freeMemoryExt / 1024,
             statistics.freeBlockInt / 1024,
             statistics.freeBlockExt / 1024,
             (int)roundf(statistics.busyPercent),
+            (int)roundf(statistics.displayBusyPercent),
             (int)roundf(statistics.totalFPS),
             (int)roundf(statistics.skippedFPS),
             (int)roundf(statistics.partialFPS),

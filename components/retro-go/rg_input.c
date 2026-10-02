@@ -7,10 +7,12 @@
 
 #ifdef ESP_PLATFORM
 #include <driver/gpio.h>
+#if defined(RG_GAMEPAD_ADC_MAP) || RG_BATTERY_DRIVER == 1
 #include <driver/adc.h>
 // This is a lazy way to silence deprecation notices on some esp-idf versions...
 // This hardcoded value is the first thing to check if something stops working!
 #define ADC_ATTEN_DB_11 3
+#endif
 #else
 #include <SDL2/SDL.h>
 #endif
@@ -47,7 +49,7 @@ static rg_battery_t battery_state = {0};
     for (size_t i = 0; i < RG_COUNT(keymap); ++i) \
         gamepad_mapped |= keymap[i].key;          \
 
-#ifdef ESP_PLATFORM
+#if defined(ESP_PLATFORM) && (defined(RG_GAMEPAD_ADC_MAP) || RG_BATTERY_DRIVER == 1)
 static inline int adc_get_raw(adc_unit_t unit, adc_channel_t channel)
 {
     if (unit == ADC_UNIT_1)

@@ -6,6 +6,8 @@ macro(rg_setup_compile_options)
         -D${RG_BUILD_TARGET}=1
         -DRETRO_GO=1
         -fjump-tables -ftree-switch-conversion
+        $<$<COMPILE_LANGUAGE:C>:-std=gnu17> # esp-idf 6.x defaults to gnu23, where f() means f(void) and breaks old-style code (prboom)
+        $<$<COMPILE_LANGUAGE:C>:-Wno-unterminated-string-initialization> # GCC 15+ (esp-idf 6.x), several emulators use fixed-size char arrays as tags
         ${ARGV}
     )
 
