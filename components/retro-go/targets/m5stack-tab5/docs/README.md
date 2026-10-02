@@ -76,6 +76,28 @@ and fmsx build for the ESP32-P4. Review notes, none of which could be measured w
 - Display path: the CPU scaler in `rg_display.c` produces the 424x240 canvas and the PPA upscales it. Feeding the
   emulator surface straight to the PPA (skipping the CPU scaler) and integer scaling are the obvious next steps.
 
+### Memory (32 MB PSRAM)
+
+PSRAM is part of the heap (`CONFIG_SPIRAM_USE_MALLOC`): allocations above 32 KB (`SPIRAM_MALLOC_ALWAYSINTERNAL`) land
+there automatically, small ones in the 768 KB of internal RAM. Nothing in the cores had to change for that:
+
+- ROMs, save state buffers and the other large `malloc` blocks of every core end up in PSRAM. gwenesis and the
+  Game & Watch core read the whole ROM into memory, the other cores load theirs the same way through `malloc`.
+- DOOM's zone allocator is `malloc` backed and only purges its lump cache when an allocation fails, so with 32 MB it
+  keeps far more of the WAD cached than on the ESP32 targets.
+- Small hot buffers that the cores explicitly place with `MEM_FAST` (frame surfaces, the Genesis VRAM) stay in internal RAM.
+
+Left as is: the 32 KB internal-RAM threshold and the 64-byte L2 cache line (M5Stack's demo uses 128 bytes). Both could be
+tuned, but only with measurements.
+
+### CPU cores
+
+The main task of every emulator runs on core 0. The display task (CPU scaler, PPA, vsync), the input task and, in
+pce-go, fmsx and prboom-go, the audio task are pinned to core 1. The USB host tasks are on core 1 as well so that
+core 0 is left to the emulator. No core splits the emulation itself across both cores (for example the Genesis sound
+chips or the SNES renderer on core 1): that needs profiling on the device and careful synchronization, and is the
+most promising change if a core turns out to be too slow, most likely snes9x.
+
 ## Not done
 
 Battery gauge (INA226), RTC (RX8130), microphone (ES7210), Bluetooth through the C6, touch in the on-screen

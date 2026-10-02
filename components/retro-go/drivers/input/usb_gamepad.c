@@ -214,13 +214,15 @@ void rg_usb_gamepad_init(void)
         RG_LOGE("USB host install failed");
         return;
     }
-    rg_task_create("rg_usb_host", &usb_lib_task, NULL, 4 * 1024, RG_TASK_PRIORITY_5, 0);
+    // The USB tasks are light, keep them on core 1 with the display, input and audio tasks so that core 0 is left to the
+    // emulator
+    rg_task_create("rg_usb_host", &usb_lib_task, NULL, 4 * 1024, RG_TASK_PRIORITY_5, 1);
 
     const hid_host_driver_config_t hid_cfg = {
         .create_background_task = true,
         .task_priority = 5,
         .stack_size = 4096,
-        .core_id = 0,
+        .core_id = 1,
         .callback = driver_event_cb,
         .callback_arg = NULL,
     };

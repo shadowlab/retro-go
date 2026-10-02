@@ -114,7 +114,10 @@ static void lcd_init(void)
     esp_cache_msync(fb0, lcd_fb_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
     esp_cache_msync(fb1, lcd_fb_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
 
-    lcd_canvas = heap_caps_aligned_calloc(64, 1, RG_SCREEN_WIDTH * RG_SCREEN_HEIGHT * 2, MALLOC_CAP_SPIRAM);
+    // The PPA and the cache sync need the canvas aligned to (and sized in multiples of) the PSRAM cache line
+    const size_t cache_align = CONFIG_CACHE_L2_CACHE_LINE_SIZE;
+    size_t canvas_size = (RG_SCREEN_WIDTH * RG_SCREEN_HEIGHT * 2 + cache_align - 1) & ~(cache_align - 1);
+    lcd_canvas = heap_caps_aligned_calloc(cache_align, 1, canvas_size, MALLOC_CAP_SPIRAM);
     RG_ASSERT(lcd_canvas, "Out of memory for the display canvas");
 
     ppa_client_config_t ppa_cfg = {.oper_type = PPA_OPERATION_SRM};
