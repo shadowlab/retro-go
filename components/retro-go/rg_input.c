@@ -7,10 +7,12 @@
 
 #ifdef ESP_PLATFORM
 #include <driver/gpio.h>
+#if defined(RG_GAMEPAD_ADC_MAP) || RG_BATTERY_DRIVER == 1
 #include <driver/adc.h>
 // This is a lazy way to silence deprecation notices on some esp-idf versions...
 // This hardcoded value is the first thing to check if something stops working!
 #define ADC_ATTEN_DB_11 3
+#endif
 #else
 #include <SDL2/SDL.h>
 #endif
