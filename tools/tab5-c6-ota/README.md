@@ -80,13 +80,16 @@ idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.esp32c6;sdkco
 idf.py build
 ```
 
-and copy the application image (`build/*.bin`, the one that is not the bootloader or partition table, it is named after the
-project) to `firmware/network_adapter.bin`. The partition table of the example (`partitions_eh_cp_ota_4m.csv`) is not applied by an
+and copy the application image (`build/eh_cp_ota_coprocessor_ota.bin`, not the bootloader or partition table) to
+`firmware/network_adapter.bin`. Built like this with ESP-IDF 6.1 it is an ESP32-C6 image with DIO flash mode of 1,440,416 bytes (the C6
+slot is 1,572,864, so about 130 KB are spare), with Wi-Fi and the Bluetooth controller, and it embeds in this application. Its project
+name is `eh_cp_ota_coprocessor_ota`, so the application warns that it is not named `network_adapter`, which is harmless. It
+has not been run on a C6. The partition table of the example (`partitions_eh_cp_ota_4m.csv`) is not applied by an
 OTA, only the app slot is replaced, the C6 keeps the layout it has.
 
 **Check the image** (`esptool image_info`, or the log of this application when it starts): chip ESP32-C6, flash mode DIO
-(the CrowPanel author saw failed OTAs with QIO images, the factory image of the Tab5 is DIO), project `network_adapter`,
-version 3.0.9, and not bigger than the slots of the C6 (1.5 MB).
+(the CrowPanel author saw failed OTAs with QIO images, the factory image of the Tab5 is DIO), and not bigger than the slots of
+the C6 (1.5 MB). The ESPHome image is named `network_adapter`, a build from source after its example.
 
 ## Build and flash
 
