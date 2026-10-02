@@ -72,7 +72,7 @@ uint16_t S9xGetWord(uint32_t Address)
       if (Memory.MapInfo[block].Type == MAP_TYPE_RAM)
          CPU.WaitAddress = CPU.PCAtOpcodeStart;
 #ifdef FAST_LSB_WORD_ACCESS
-      return S9xLoad16(GetAddress + (Address & 0xffff));
+      return *(uint16_t*) (GetAddress + (Address & 0xffff));
 #else
       return *(GetAddress + (Address & 0xffff)) | (*(GetAddress + (Address & 0xffff) + 1) << 8);
 #endif
@@ -200,7 +200,7 @@ void S9xSetWord(uint16_t Word, uint32_t Address)
    {
       SetAddress += Address & 0xffff;
 #ifdef FAST_LSB_WORD_ACCESS
-      S9xStore16(SetAddress, Word);
+      *(uint16_t*)SetAddress = Word;
 #else
       *SetAddress = (uint8_t) Word;
       *(SetAddress + 1) = Word >> 8;

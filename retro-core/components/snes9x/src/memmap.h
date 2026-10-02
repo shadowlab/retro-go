@@ -6,12 +6,12 @@
 #include "snes9x.h"
 
 #ifdef FAST_LSB_WORD_ACCESS
-#define READ_WORD(s)      S9xLoad16(s)
-#define READ_DWORD(s)     S9xLoad32(s)
-#define WRITE_WORD(s, d)  S9xStore16((s), (d))
-#define WRITE_DWORD(s, d) S9xStore32((s), (d))
-#define READ_3WORD(s)     (S9xLoad32(s) & 0x00ffffff)
-#define WRITE_3WORD(s, d) S9xStore16((s), (uint16_t)(d)), *((uint8_t *) (s) + 2) = (uint8_t) ((d) >> 16)
+#define READ_WORD(s)      (*(uint16_t *) (s))
+#define READ_DWORD(s)     (*(uint32_t *) (s))
+#define WRITE_WORD(s, d)  (*(uint16_t *) (s)) = (d)
+#define WRITE_DWORD(s, d) (*(uint32_t *) (s)) = (d)
+#define READ_3WORD(s)     ((*(uint32_t *) (s)) & 0x00ffffff)
+#define WRITE_3WORD(s, d) *(uint16_t *) (s) = (uint16_t)(d), *((uint8_t *) (s) + 2) = (uint8_t) ((d) >> 16)
 #else
 #define READ_WORD(s)      (*(uint8_t *) (s) | (*((uint8_t *) (s) + 1) << 8))
 #define READ_DWORD(s)     (*(uint8_t *) (s) | (*((uint8_t *) (s) + 1) << 8) | (*((uint8_t *) (s) + 2) << 16) | (*((uint8_t *) (s) + 3) << 24))

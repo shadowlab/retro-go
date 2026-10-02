@@ -4,7 +4,6 @@
 #define _PORT_H_
 
 #include <limits.h>
-#include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
 #include <strings.h>
@@ -16,58 +15,6 @@
 
 #ifndef INLINE
 #define INLINE inline
-#endif
-
-/* Unaligned little-endian memory access.
- * The 65816 and SPC700 cores read 16 and 32-bit operands at arbitrary addresses, so plain pointer casts are not
- * safe: they are undefined behaviour in C and fault on CPUs that trap on misaligned accesses. memcpy compiles to
- * a single load/store where the CPU supports misaligned access (and to byte accesses with -mstrict-align), so
- * there is no cost compared to a pointer cast. These assume a little-endian host (see FAST_LSB_WORD_ACCESS).
- * Xtensa keeps the original pointer casts: it was not re-evaluated there, and memcpy may be slower on it. */
-#ifdef __xtensa__
-static INLINE uint16_t S9xLoad16(const void* p)
-{
-   return *(const uint16_t*) p;
-}
-
-static INLINE uint32_t S9xLoad32(const void* p)
-{
-   return *(const uint32_t*) p;
-}
-
-static INLINE void S9xStore16(void* p, uint16_t v)
-{
-   *(uint16_t*) p = v;
-}
-
-static INLINE void S9xStore32(void* p, uint32_t v)
-{
-   *(uint32_t*) p = v;
-}
-#else
-static INLINE uint16_t S9xLoad16(const void* p)
-{
-   uint16_t v;
-   memcpy(&v, p, sizeof(v));
-   return v;
-}
-
-static INLINE uint32_t S9xLoad32(const void* p)
-{
-   uint32_t v;
-   memcpy(&v, p, sizeof(v));
-   return v;
-}
-
-static INLINE void S9xStore16(void* p, uint16_t v)
-{
-   memcpy(p, &v, sizeof(v));
-}
-
-static INLINE void S9xStore32(void* p, uint32_t v)
-{
-   memcpy(p, &v, sizeof(v));
-}
 #endif
 
 #ifdef PSP

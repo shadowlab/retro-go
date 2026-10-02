@@ -226,7 +226,7 @@ static void S9xAPUSetByte(uint8_t byte, uint32_t Address)
        IAPU.RAM[0x100] = ((w) >> 8); \
     } \
     else \
-       S9xStore16(IAPU.RAM + 0xff + IAPU.Registers.S, w); \
+       *(uint16_t *) (IAPU.RAM + 0xff + IAPU.Registers.S) = w; \
     IAPU.Registers.S -= 2
 
 #define PopW(w) \
@@ -234,7 +234,7 @@ static void S9xAPUSetByte(uint8_t byte, uint32_t Address)
     if (IAPU.Registers.S == 0) \
        (w) = IAPU.RAM[0x1ff] | (IAPU.RAM[0x100] << 8); \
     else \
-       (w) = S9xLoad16(IAPU.RAM + 0xff + IAPU.Registers.S)
+       (w) = *(uint16_t *) (IAPU.RAM + 0xff + IAPU.Registers.S)
 #else
 #define PushW(w) \
     IAPU.RAM[0xff + IAPU.Registers.S] = w; \
@@ -259,24 +259,24 @@ static void S9xAPUSetByte(uint8_t byte, uint32_t Address)
 
 #ifdef FAST_LSB_WORD_ACCESS
 #define IndexedXIndirect() \
-    IAPU.Address = S9xLoad16(IAPU.DirectPage + ((OP1 + IAPU.Registers.X) & 0xff));
+    IAPU.Address = *(uint16_t *) (IAPU.DirectPage + ((OP1 + IAPU.Registers.X) & 0xff));
 
 #define Absolute() \
-    IAPU.Address = S9xLoad16(IAPU.PC + 1);
+    IAPU.Address = *(uint16_t *) (IAPU.PC + 1);
 
 #define AbsoluteX() \
-    IAPU.Address = S9xLoad16(IAPU.PC + 1) + IAPU.Registers.X;
+    IAPU.Address = *(uint16_t *) (IAPU.PC + 1) + IAPU.Registers.X;
 
 #define AbsoluteY() \
-    IAPU.Address = S9xLoad16(IAPU.PC + 1) + IAPU.Registers.YA.B.Y;
+    IAPU.Address = *(uint16_t *) (IAPU.PC + 1) + IAPU.Registers.YA.B.Y;
 
 #define MemBit() \
-    IAPU.Address = S9xLoad16(IAPU.PC + 1); \
+    IAPU.Address = *(uint16_t *) (IAPU.PC + 1); \
     IAPU.Bit = (uint8_t)(IAPU.Address >> 13); \
     IAPU.Address &= 0x1fff;
 
 #define IndirectIndexedY() \
-    IAPU.Address = S9xLoad16(IAPU.DirectPage + OP1) + IAPU.Registers.YA.B.Y;
+    IAPU.Address = *(uint16_t *) (IAPU.DirectPage + OP1) + IAPU.Registers.YA.B.Y;
 #else
 #define IndexedXIndirect() \
     IAPU.Address = IAPU.DirectPage[(OP1 + IAPU.Registers.X) & 0xff] + \

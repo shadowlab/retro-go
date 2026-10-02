@@ -208,7 +208,7 @@ static void Op29M1(void)
 static void Op29M0(void)
 {
 #ifdef FAST_LSB_WORD_ACCESS
-   ICPU.Registers.A.W &= S9xLoad16(CPU.PC);
+   ICPU.Registers.A.W &= *(uint16_t*) CPU.PC;
 #else
    ICPU.Registers.A.W &= *CPU.PC + (*(CPU.PC + 1) << 8);
 #endif
@@ -458,7 +458,7 @@ static void Op89M1(void)
 static void Op89M0(void)
 {
 #ifdef FAST_LSB_WORD_ACCESS
-   ICPU._Zero = (ICPU.Registers.A.W & S9xLoad16(CPU.PC)) != 0;
+   ICPU._Zero = (ICPU.Registers.A.W & *(uint16_t*) CPU.PC) != 0;
 #else
    ICPU._Zero = (ICPU.Registers.A.W & (*CPU.PC + (*(CPU.PC + 1) << 8))) != 0;
 #endif
@@ -530,7 +530,7 @@ static void OpC9M1(void)
 static void OpC9M0(void)
 {
 #ifdef FAST_LSB_WORD_ACCESS
-   int32_t Int32 = (int32_t) ICPU.Registers.A.W - (int32_t) S9xLoad16(CPU.PC);
+   int32_t Int32 = (int32_t) ICPU.Registers.A.W - (int32_t) *(uint16_t*)CPU.PC;
 #else
    int32_t Int32 = (int32_t) ICPU.Registers.A.W - (int32_t)(*CPU.PC + (*(CPU.PC + 1) << 8));
 #endif
@@ -724,7 +724,7 @@ static void OpE0X1(void)
 static void OpE0X0(void)
 {
 #ifdef FAST_LSB_WORD_ACCESS
-   int32_t Int32 = (int32_t) ICPU.Registers.X.W - (int32_t) S9xLoad16(CPU.PC);
+   int32_t Int32 = (int32_t) ICPU.Registers.X.W - (int32_t) *(uint16_t*)CPU.PC;
 #else
    int32_t Int32 = (int32_t) ICPU.Registers.X.W - (int32_t)(*CPU.PC + (*(CPU.PC + 1) << 8));
 #endif
@@ -774,7 +774,7 @@ static void OpC0X1(void)
 static void OpC0X0(void)
 {
 #ifdef FAST_LSB_WORD_ACCESS
-   int32_t Int32 = (int32_t) ICPU.Registers.Y.W - (int32_t) S9xLoad16(CPU.PC);
+   int32_t Int32 = (int32_t) ICPU.Registers.Y.W - (int32_t) *(uint16_t*)CPU.PC;
 #else
    int32_t Int32 = (int32_t) ICPU.Registers.Y.W - (int32_t)(*CPU.PC + (*(CPU.PC + 1) << 8));
 #endif
@@ -882,7 +882,7 @@ static void Op49M1(void)
 static void Op49M0(void)
 {
 #ifdef FAST_LSB_WORD_ACCESS
-   ICPU.Registers.A.W ^= S9xLoad16(CPU.PC);
+   ICPU.Registers.A.W ^= *(uint16_t*) CPU.PC;
 #else
    ICPU.Registers.A.W ^= *CPU.PC + (*(CPU.PC + 1) << 8);
 #endif
@@ -1133,7 +1133,7 @@ static void OpA9M1(void)
 static void OpA9M0(void)
 {
 #ifdef FAST_LSB_WORD_ACCESS
-   ICPU.Registers.A.W = S9xLoad16(CPU.PC);
+   ICPU.Registers.A.W = *(uint16_t*) CPU.PC;
 #else
    ICPU.Registers.A.W = *CPU.PC + (*(CPU.PC + 1) << 8);
 #endif
@@ -1326,7 +1326,7 @@ static void OpA2X1(void)
 static void OpA2X0(void)
 {
 #ifdef FAST_LSB_WORD_ACCESS
-   ICPU.Registers.X.W = S9xLoad16(CPU.PC);
+   ICPU.Registers.X.W = *(uint16_t*) CPU.PC;
 #else
    ICPU.Registers.X.W = *CPU.PC + (*(CPU.PC + 1) << 8);
 #endif
@@ -1398,7 +1398,7 @@ static void OpA0X1(void)
 static void OpA0X0(void)
 {
 #ifdef FAST_LSB_WORD_ACCESS
-   ICPU.Registers.Y.W = S9xLoad16(CPU.PC);
+   ICPU.Registers.Y.W = *(uint16_t*) CPU.PC;
 #else
    ICPU.Registers.Y.W = *CPU.PC + (*(CPU.PC + 1) << 8);
 #endif
@@ -1530,7 +1530,7 @@ static void Op09M1(void)
 static void Op09M0(void)
 {
 #ifdef FAST_LSB_WORD_ACCESS
-   ICPU.Registers.A.W |= S9xLoad16(CPU.PC);
+   ICPU.Registers.A.W |= *(uint16_t*) CPU.PC;
 #else
    ICPU.Registers.A.W |= *CPU.PC + (*(CPU.PC + 1) << 8);
 #endif
