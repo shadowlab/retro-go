@@ -38,6 +38,7 @@ bool rg_tab5_battery_read(float *level, float *volts, bool *charging);
 
 // Video (MIPI-DSI, see drivers/display/mipi_dsi.h)
 #define RG_GAMEPAD_USB_HID          1
+#define RG_GAMEPAD_BLE_HID          1
 #define RG_TOUCH_ST712X             1
 #define RG_SCREEN_DRIVER            2
 #define RG_GPIO_LCD_BCKL            GPIO_NUM_22

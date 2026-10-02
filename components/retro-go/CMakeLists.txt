@@ -17,7 +17,7 @@ endif()
 # Targets with a MIPI-DSI display, touch, codecs and USB host (see idf_component.yml)
 if(IDF_TARGET STREQUAL "esp32p4")
     list(APPEND COMPONENT_REQUIRES esp_lcd esp_driver_ppa esp_driver_ledc esp_driver_i2c esp_driver_i2s esp_mm esp_pm
-         espressif__esp_lcd_st7121 espressif__esp_lcd_touch_st7123 espressif__esp_codec_dev espressif__usb_host_hid espressif__esp_hosted)
+         espressif__esp_lcd_st7121 espressif__esp_lcd_touch_st7123 espressif__esp_codec_dev espressif__usb_host_hid espressif__esp_hosted bt esp_hid nvs_flash)
 endif()
 
 register_component()

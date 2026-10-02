@@ -11,6 +11,9 @@
 #ifdef RG_TOUCH_ST712X
 #include "drivers/input/touch_st712x.h"
 #endif
+#ifdef RG_GAMEPAD_BLE_HID
+#include "drivers/input/ble_hid_pad.h"
+#endif
 
 #ifdef ESP_PLATFORM
 #include <driver/gpio.h>
@@ -234,6 +237,10 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
     state |= rg_usb_gamepad_read();
 #endif
 
+#if defined(RG_GAMEPAD_BLE_HID)
+    state |= rg_ble_pad_read();
+#endif
+
 #if defined(RG_TOUCH_ST712X)
     state |= rg_touch_read();
 #endif
@@ -391,6 +398,10 @@ void rg_input_init(void)
     gamepad_mapped |= RG_KEY_ALL & ((1 << RG_KEY_COUNT) - 1);
 #endif
 
+#if defined(RG_GAMEPAD_BLE_HID)
+    rg_ble_pad_init(); // Does nothing unless the user has enabled Bluetooth controllers
+#endif
+
 #if defined(RG_TOUCH_ST712X)
     RG_LOGI("Initializing touch driver...");
     rg_touch_init();
@@ -412,6 +423,32 @@ void rg_input_deinit(void)
     // while (gamepad_state != -1)
     //     rg_task_yield();
     RG_LOGI("Input terminated.\n");
+}
+
+// Bluetooth controllers: 0 = off, 1 = on, 2 = pair a new controller
+int rg_input_bt_get_mode(void)
+{
+#ifdef RG_GAMEPAD_BLE_HID
+    return rg_ble_pad_get_mode();
+#else
+    return 0;
+#endif
+}
+
+void rg_input_bt_set_mode(int mode)
+{
+#ifdef RG_GAMEPAD_BLE_HID
+    rg_ble_pad_set_mode(mode);
+#endif
+}
+
+const char *rg_input_bt_status(void)
+{
+#ifdef RG_GAMEPAD_BLE_HID
+    return rg_ble_pad_status();
+#else
+    return "";
+#endif
 }
 
 static int touch_ui_depth = 0;

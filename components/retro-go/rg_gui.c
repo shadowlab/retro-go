@@ -1625,6 +1625,23 @@ static rg_gui_event_t led_indicator_cb(rg_gui_option_t *option, rg_gui_event_t e
     return RG_DIALOG_VOID;
 }
 
+#ifdef RG_GAMEPAD_BLE_HID
+static rg_gui_event_t bt_pads_cb(rg_gui_option_t *option, rg_gui_event_t event)
+{
+    // Off -> On -> Pair a new controller
+    int mode = rg_input_bt_get_mode();
+    if (event == RG_DIALOG_NEXT)
+        rg_input_bt_set_mode((mode + 1) % 3), mode = rg_input_bt_get_mode();
+    else if (event == RG_DIALOG_PREV)
+        rg_input_bt_set_mode((mode + 2) % 3), mode = rg_input_bt_get_mode();
+    if (event == RG_DIALOG_PREV || event == RG_DIALOG_NEXT)
+        return RG_DIALOG_REDRAW;
+
+    strcpy(option->value, mode == 0 ? _("Off") : rg_input_bt_status());
+    return RG_DIALOG_VOID;
+}
+#endif
+
 static rg_gui_event_t show_clock_cb(rg_gui_option_t *option, rg_gui_event_t event)
 {
     if (event == RG_DIALOG_PREV || event == RG_DIALOG_NEXT)
@@ -2035,6 +2052,9 @@ void rg_gui_options_menu(void)
         #endif
         #ifdef RG_ENABLE_NETWORKING
         {0, _("Wi-Fi options"), NULL, RG_DIALOG_FLAG_NORMAL, &wifi_cb},
+        #endif
+        #ifdef RG_GAMEPAD_BLE_HID
+        {0, _("Bluetooth pads"), "-", RG_DIALOG_FLAG_NORMAL, &bt_pads_cb},
         #endif
         {0, _("Launcher options"), NULL, RG_DIALOG_FLAG_NORMAL, &app_options_cb},
         RG_DIALOG_END,

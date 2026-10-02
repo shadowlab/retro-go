@@ -47,7 +47,7 @@ static const uint32_t button_map[] = {
     RG_KEY_OPTION, // 14 Touchpad / Capture
 };
 
-static uint32_t translate_pad(uint8_t dpad, uint32_t buttons)
+uint32_t rg_usb_gamepad_translate(uint8_t dpad, uint32_t buttons)
 {
     uint32_t keys = 0;
     if (dpad & HID_PAD_UP) keys |= RG_KEY_UP;
@@ -116,7 +116,7 @@ static void interface_event_cb(hid_host_device_handle_t handle, const hid_host_i
             uint8_t dpad;
             uint32_t buttons;
             if (hid_decode_gamepad_report(&pad->desc, data, len, &dpad, &buttons))
-                pad->keys = translate_pad(dpad, buttons);
+                pad->keys = rg_usb_gamepad_translate(dpad, buttons);
         }
         break;
     }
@@ -250,10 +250,11 @@ uint32_t rg_usb_gamepad_read(void)
     uint8_t dpad;
     uint32_t buttons;
     rg_usb_raw_pad_read(&dpad, &buttons);
-    return keys | translate_pad(dpad, buttons);
+    return keys | rg_usb_gamepad_translate(dpad, buttons);
 }
 
 #else
+uint32_t rg_usb_gamepad_translate(uint8_t dpad, uint32_t buttons) { return 0; }
 void rg_usb_gamepad_init(void) {}
 uint32_t rg_usb_gamepad_read(void) { return 0; }
 #endif

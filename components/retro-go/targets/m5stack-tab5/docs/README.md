@@ -64,6 +64,22 @@ Not handled: Xbox 360 wireless receivers, Bluetooth controllers, PlayStation 3 p
 other makers that don't use the Pro Controller's IDs. Left stick and d-pad both drive the d-pad, triggers act as L/R.
 Everything here is untested on hardware.
 
+### Bluetooth LE controllers (`ble_hid_pad.c`)
+
+Bluetooth goes through the ESP32-C6 as well: a NimBLE host on top of ESP-Hosted's HCI transport, and `esp_hid`'s BLE HID host
+for the GATT side. Controllers that expose HID over GATT are read with the same report descriptor parser as the USB ones
+(Xbox One S / Series controllers in Bluetooth mode are the usual example).
+
+- **The C6 only does Bluetooth LE.** Controllers that use Bluetooth Classic (DualShock 4, DualSense, Switch Pro, Wii
+  remotes) can't be connected this way at all, use USB for those.
+- **Opt-in.** Launcher > Options > *Bluetooth pads* (Off / On / Pairing). Starting the radio means resetting and booting the
+  C6, so nothing is started unless the setting is on. When it is, every app starts the radio in a background task
+  (it doesn't delay the game starting) and reconnects to the controllers that were paired before.
+- **Pairing**: choose *Pairing*, put the controller in pairing mode, and within a minute the first device that advertises a gamepad
+  appearance or the HID service is connected, bonded (just works) and stored in NVS. Switching the controller on later reconnects
+  it while the setting is *On*. Turning the setting off disconnects but doesn't tear the stack down until the next boot.
+- Up to 2 controllers. Untested on hardware, including how well the shared C6 transport copes with Wi-Fi and Bluetooth at once.
+
 ## Wi-Fi
 
 `esp_wifi` forwards to the ESP32-C6 on esp-idf 6.x (`espressif/esp_hosted`, pulled by the component manager). The
@@ -121,5 +137,5 @@ most promising change if a core turns out to be too slow, most likely snes9x.
 
 ## Not done
 
-Microphone (ES7210), Bluetooth through the C6, touch in the on-screen
+Microphone (ES7210), Bluetooth Classic pads (not possible with the C6), touch in the on-screen
 keyboard, and a tap-on-row menu selection.

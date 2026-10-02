@@ -95,6 +95,10 @@ void rg_input_deinit(void);
 void rg_input_touch_ui_enter(void);
 void rg_input_touch_ui_leave(void);
 bool rg_input_touch_ui_active(void);
+// Bluetooth LE controllers (targets with RG_GAMEPAD_BLE_HID): mode 0 = off, 1 = on, 2 = pairing
+int rg_input_bt_get_mode(void);
+void rg_input_bt_set_mode(int mode);
+const char *rg_input_bt_status(void);
 bool rg_input_key_is_present(rg_key_t mask);
 bool rg_input_key_is_pressed(rg_key_t mask);
 bool rg_input_wait_for_key(rg_key_t mask, bool pressed, int timeout_ms);
