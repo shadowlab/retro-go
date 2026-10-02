@@ -36,6 +36,14 @@
 #define esp_sntp_setservername sntp_setservername
 #endif
 
+// Called by the SNTP client (tcpip thread) each time the system time has been updated from the network
+static void sntp_sync_callback(struct timeval *tv)
+{
+    RG_LOGI("Time synchronized with NTP server");
+    // Store it right away, to the RTC if the target has one, instead of waiting for the system loop to notice
+    rg_system_save_time();
+}
+
 static rg_network_state_t network_state = RG_NETWORK_DISABLED;
 static rg_wifi_config_t wifi_config = {0};
 static esp_netif_t *netif_sta, *netif_ap, *netif;
@@ -309,6 +317,7 @@ bool rg_network_init(void)
     // Setup SNTP client but don't query it yet
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, "pool.ntp.org");
+    sntp_set_time_sync_notification_cb(sntp_sync_callback);
     // esp_sntp_init();
 
     // Load the user's chosen config profile, if any
