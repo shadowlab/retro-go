@@ -61,7 +61,8 @@
 }
 
 // Battery: not defined yet (no battery sense pin provided)
-// Status LED: not defined yet (no LED pin provided)
+// Status LED
+#define RG_GPIO_LED                 GPIO_NUM_38
 
 // SPI Display
 #define RG_GPIO_LCD_MISO            GPIO_NUM_NC
