@@ -43,6 +43,7 @@ for t in glob.glob("components/retro-go/targets/*/config.h"):
     TARGETS.append(os.path.basename(os.path.dirname(t)))
 
 IDF_TARGET = os.getenv("IDF_TARGET", "esp32")
+IDF_PREVIEW = False  # Set to True in a target's env.py if the chip is a preview target in esp-idf
 IDF_PATH = os.getenv("IDF_PATH")
 if not IDF_PATH:
     exit("IDF_PATH is not defined. Are you running inside esp-idf environment?")
@@ -113,7 +114,7 @@ def clean_app(app):
 def build_app(app, device_type, with_profiling=False, no_networking=False, is_release=False):
     # To do: clean up if any of the flags changed since last build
     print("Building app '%s'" % app)
-    args = [IDF_PY, "app"]
+    args = [IDF_PY, *(["--preview"] if IDF_PREVIEW else []), "app"]
     args.append(f"-DRG_PROJECT_APP={app}")
     args.append(f"-DRG_PROJECT_VER={PROJECT_VER}")
     args.append(f"-DRG_BUILD_TARGET=RG_TARGET_{re.sub(r'[^A-Z0-9]', '_', device_type.upper())}")
