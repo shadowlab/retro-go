@@ -4,6 +4,14 @@
 CONFIG_ESPTOOLPY_COMPRESSED=y
 
 #
+# Flash: 16MB at 80MHz
+#
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_ESPTOOLPY_FLASHFREQ="80m"
+
+#
 # Compiler options
 #
 CONFIG_COMPILER_OPTIMIZATION_DEFAULT=n
@@ -40,11 +48,12 @@ CONFIG_NEWLIB_NANO_FORMAT=y
 
 #
 # SPI RAM config
-# 16MB octal PSRAM. Speed is left at the esp-idf default until the right value is confirmed,
-# check "SPI RAM config" in `idf.py --preview menuconfig` for the speeds available on ESP32-S31.
+# 16MB octal PSRAM at 80MHz.
+# Option names are untested on ESP32-S31, verify in `idf.py --preview menuconfig` if the build ignores them.
 #
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_BOOT_INIT=y
 CONFIG_SPIRAM_IGNORE_NOTFOUND=y
 CONFIG_SPIRAM_USE_MEMMAP=n
