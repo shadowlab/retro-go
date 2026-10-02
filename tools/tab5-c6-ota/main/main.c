@@ -89,8 +89,9 @@ static bool check_image(image_info_t *info)
         memcpy(info->version, desc + 16, 32);
         memcpy(info->project, desc + 48, 32);
         ESP_LOGI(TAG, "[DIAG] Image: %s, version %s, %zu bytes", info->project, info->version, len);
-        if (strcmp(info->project, "network_adapter") != 0)
-            ESP_LOGW(TAG, "[WARN] This doesn't look like the ESP-Hosted co-processor firmware (network_adapter)");
+        /* "network_adapter" in older releases, "eh_cp_..." in the 3.x examples and builds */
+        if (strcmp(info->project, "network_adapter") != 0 && strncmp(info->project, "eh_cp_", 6) != 0)
+            ESP_LOGW(TAG, "[WARN] This doesn't look like the ESP-Hosted co-processor firmware");
     }
     else
     {
