@@ -20,7 +20,7 @@ Requirements and caveats:
 - The sdkconfig selects ESP32-P4 **revision below v3** (`CONFIG_ESP32P4_SELECTS_REV_LESS_V3`). Chip revisions below
   and above v3 are mutually exclusive in ESP-IDF 6.1: a bootloader built for one refuses to boot on the other.
   Check the chip revision printed by the bootloader and change the option if yours is v3.
-- **PSRAM voltage:** ESP-IDF 6.1 powers the PSRAM from LDO channel 2 at a fixed 1.8 V, ESP-IDF 5.4.2 used 1.9 V.
+- **PSRAM voltage:** ESP-IDF 6.1 powers the PSRAM at a fixed 1.8 V, ESP-IDF 5.4.2 used 1.9 V.
   M5Stack's own demo is built with 5.4.2. If the board fails to boot or PSRAM is unstable, try 5.4.2 first.
 
 ## Hardware used
