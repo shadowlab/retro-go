@@ -51,7 +51,7 @@
 // (pins 3, 4: 3.0-3.6V, supply must deliver at least 0.6A) and exposes every GPIO used here. The chip's VDDPST_x/VDDA
 // rails, including the SD domain source (VDDPST_2), are inside the module, so nothing needs to be wired for them.
 // The module labels the SD pins SD_D0-SD_D3/SD_CLK/SD_CMD (module pins 27-32, GPIO20-25).
-// Module schematic (WROOM-3, datasheet figure 8-1): pin 43 VCCA/VDDPST_2 is tied to 3V3 (0.1uF), IO36 has a 10K pull-up to 3V3
+// Module schematic (WROOM-3U, datasheet figure 8-2): pin 43 VCCA/VDDPST_2 is tied to 3V3 (0.1uF), IO36 has a 10K pull-up to 3V3
 // (strapping, selects 3.3V flash, do not pull it low), and the SD lines have NO pull-ups on the module: fit external
 // pull-ups (typically 10K) on SD_CMD and SD_D0-SD_D3 on the carrier board.
 
