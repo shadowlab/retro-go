@@ -44,8 +44,25 @@ The Tab5 has no hardware buttons, so input is USB or touch only. Plug a gamepad 
 ### USB gamepad button layout
 
 Button 1-4 (west, south, east, north on most pads) map to Y, B, A, X, 5/6 and 7/8 to L/R, 9 to Select, 10 to Start,
-13 to Menu, 14 to Option. This matches DualShock 4, DualSense and most DInput pads. Not handled: Xbox pads (not HID
-class), and the Switch Pro Controller needs a USB handshake that isn't implemented. There is no remapping UI yet.
+13 to Menu, 14 to Option. This matches DualShock 4, DualSense and most DInput pads. There is no remapping UI yet.
+
+### Pads without a standard HID report (`usb_raw_pad.c`)
+
+A second USB host client drives controllers that the HID driver can't, with the report layouts of the Linux `xpad` and
+`hid-nintendo` drivers (`gamepad_protocols.c`, host-tested with synthetic reports). Buttons are placed by their position
+on the pad like above, so A/B follow the Nintendo layout on every pad.
+
+- **Xbox 360 wired** class controllers (vendor interface 0xFF/0x5D/1, including most third party XInput pads).
+- **Xbox One / Series** controllers (0xFF/0x47/0xD0): the power-on packet is sent after the interface is claimed.
+  The Guide button is not read and the acknowledgements some models want for it are not sent.
+- **Switch Pro Controller** (057E:2009 over USB): the USB handshake (0x80 0x02, 0x03, 0x02, 0x04, each waiting for the
+  controller's echo and repeated if it doesn't answer) and the full report mode request are sent, then the 0x30
+  reports are decoded. Left stick centering uses a fixed 2048 +-700 instead of the calibration in the controller's flash;
+  rumble is off.
+
+Not handled: Xbox 360 wireless receivers, Bluetooth controllers, PlayStation 3 pads, Joy-Cons and Switch controllers from
+other makers that don't use the Pro Controller's IDs. Left stick and d-pad both drive the d-pad, triggers act as L/R.
+Everything here is untested on hardware.
 
 ## Wi-Fi
 

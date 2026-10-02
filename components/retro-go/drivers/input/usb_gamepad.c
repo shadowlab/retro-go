@@ -10,6 +10,7 @@
 #include <stdlib.h>
 
 #include "hid_parser.h"
+#include "usb_raw_pad.h"
 #if defined(RG_TARGET_M5STACK_TAB5)
 #include "drivers/board/m5stack_tab5.h"
 #endif
@@ -145,6 +146,10 @@ static void driver_event_cb(hid_host_device_handle_t handle, const hid_host_driv
     if (params.sub_class == 1 && params.proto == 2)
         return;
 
+    // The Switch Pro Controller needs a handshake first, usb_raw_pad.c drives it
+    if (rg_usb_raw_pad_wants_device(info.VID, info.PID))
+        return;
+
     usb_pad_t *pad = NULL;
     for (int i = 0; i < MAX_DEVICES && !pad; ++i)
         pad = pads[i].handle ? NULL : &pads[i];
@@ -231,6 +236,7 @@ void rg_usb_gamepad_init(void)
         RG_LOGE("USB HID host install failed");
         return;
     }
+    rg_usb_raw_pad_init();
     started = true;
     RG_LOGI("USB HID gamepad host ready");
 }
@@ -240,7 +246,11 @@ uint32_t rg_usb_gamepad_read(void)
     uint32_t keys = 0;
     for (int i = 0; i < MAX_DEVICES; ++i)
         keys |= pads[i].keys;
-    return keys;
+
+    uint8_t dpad;
+    uint32_t buttons;
+    rg_usb_raw_pad_read(&dpad, &buttons);
+    return keys | translate_pad(dpad, buttons);
 }
 
 #else
