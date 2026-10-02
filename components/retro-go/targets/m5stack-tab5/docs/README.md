@@ -102,7 +102,8 @@ and the C6 (slot 1) share the SDMMC controller as in ESP-Hosted's own `mcu_hoste
   `ESP32C6-WiFi-SDIO-Interface-V1.4.1`) while this build uses the ESP-Hosted *host* 3.0.x. Host and slave versions
   are expected to match, so the C6 will probably need to be flashed with an ESP-Hosted 3.x SDIO slave (the `slave`
   example of esp-hosted, built for esp32c6). Not verified. A separate updater that flashes the C6 over the SDIO link
-  is in `tools/tab5-c6-ota` (PR #4, not part of this build); it can embed ESPHome's prebuilt v3.0.9 image.
+  is in its own repository, [shadowlab/tab5-p4-c6-sdio-ota](https://github.com/shadowlab/tab5-p4-c6-sdio-ota) (not part of this build);
+  it can embed ESPHome's prebuilt v3.0.9 image. Flash it on its own first, then flash Retro-Go over it.
 - **Time:** Retro-Go starts an SNTP client (`pool.ntp.org`) whenever the station gets an IP address. Each successful
   sync now saves the time right away (clock file and RTC) through `rg_system_save_time()`.
 - Untested on hardware. Bluetooth through the C6 is not set up.
