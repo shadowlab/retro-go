@@ -40,3 +40,30 @@ jobs:
       with:
         name: binaries
         path: build/*.fw
+
+  release:
+    name: Publish release
+    # Only for version tags (git tag v1.2.3 && git push origin v1.2.3), and only if the build above passed
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Download the binaries
+      uses: actions/download-artifact@v4
+      with:
+        name: binaries
+        path: release
+
+    - name: Checksums
+      run: |
+        cd release
+        sha256sum *.fw | tee SHA256SUMS
+
+    - name: Publish
+      uses: softprops/action-gh-release@v2
+      with:
+        generate_release_notes: true
+        files: release/*
