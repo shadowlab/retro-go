@@ -5,12 +5,27 @@
 #include <string.h>
 #include <math.h>
 
+#ifdef RG_GAMEPAD_USB_HID
+#include "drivers/input/usb_gamepad.h"
+#endif
+#ifdef RG_TOUCH_ST712X
+#include "drivers/input/touch_st712x.h"
+#endif
+#ifdef RG_GAMEPAD_BLE_HID
+#include "drivers/input/ble_hid_pad.h"
+#endif
+#ifdef RG_GAMEPAD_USB_HID
+#include "drivers/input/pad_map.h"
+#endif
+
 #ifdef ESP_PLATFORM
 #include <driver/gpio.h>
+#if defined(RG_GAMEPAD_ADC_MAP) || RG_BATTERY_DRIVER == 1
 #include <driver/adc.h>
 // This is a lazy way to silence deprecation notices on some esp-idf versions...
 // This hardcoded value is the first thing to check if something stops working!
 #define ADC_ATTEN_DB_11 3
+#endif
 #else
 #include <SDL2/SDL.h>
 #endif
@@ -42,12 +57,15 @@ static bool input_task_running = false;
 static uint32_t gamepad_state = -1; // _Atomic
 static uint32_t gamepad_mapped = 0;
 static rg_battery_t battery_state = {0};
+#ifdef RG_GAMEPAD_USB_HID
+static void pad_map_load(void);
+#endif
 
 #define UPDATE_GLOBAL_MAP(keymap)                 \
     for (size_t i = 0; i < RG_COUNT(keymap); ++i) \
         gamepad_mapped |= keymap[i].key;          \
 
-#ifdef ESP_PLATFORM
+#if defined(ESP_PLATFORM) && (defined(RG_GAMEPAD_ADC_MAP) || RG_BATTERY_DRIVER == 1)
 static inline int adc_get_raw(adc_unit_t unit, adc_channel_t channel)
 {
     if (unit == ADC_UNIT_1)
@@ -87,6 +105,20 @@ bool rg_input_read_battery_raw(rg_battery_t *out)
         return false;
     raw_value = data[4];
     charging = data[4] == 255;
+#elif RG_BATTERY_DRIVER == 3 /* Provided by the target */
+    float level_percent = 0.f, volts = 0.f;
+    if (!RG_TARGET_BATTERY_READ(&level_percent, &volts, &charging))
+        return false;
+    if (out)
+    {
+        *out = (rg_battery_t){
+            .level = RG_MAX(0.f, RG_MIN(100.f, level_percent)),
+            .volts = volts,
+            .present = present,
+            .charging = charging,
+        };
+    }
+    return true;
 #else
     return false;
 #endif
@@ -205,6 +237,18 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
         if (state == keymap_virt[i].src)
             state = keymap_virt[i].key;
     }
+#endif
+
+#if defined(RG_GAMEPAD_USB_HID)
+    state |= rg_usb_gamepad_read();
+#endif
+
+#if defined(RG_GAMEPAD_BLE_HID)
+    state |= rg_ble_pad_read();
+#endif
+
+#if defined(RG_TOUCH_ST712X)
+    state |= rg_touch_read();
 #endif
 
     if (out)
@@ -354,6 +398,22 @@ void rg_input_init(void)
     }
 #endif
 
+#if defined(RG_GAMEPAD_USB_HID)
+    pad_map_load();
+    RG_LOGI("Initializing USB HID gamepad driver...");
+    rg_usb_gamepad_init();
+    gamepad_mapped |= RG_KEY_ALL & ((1 << RG_KEY_COUNT) - 1);
+#endif
+
+#if defined(RG_GAMEPAD_BLE_HID)
+    rg_ble_pad_init(); // Does nothing unless the user has enabled Bluetooth controllers
+#endif
+
+#if defined(RG_TOUCH_ST712X)
+    RG_LOGI("Initializing touch driver...");
+    rg_touch_init();
+#endif
+
     // The first read returns bogus data in some drivers, waste it.
     rg_input_read_gamepad_raw(NULL);
 
@@ -370,6 +430,161 @@ void rg_input_deinit(void)
     // while (gamepad_state != -1)
     //     rg_task_yield();
     RG_LOGI("Input terminated.\n");
+}
+
+// Button mapping of external controllers (USB, Bluetooth). Stored as "PadMap<N>" settings, only when changed.
+#ifdef RG_GAMEPAD_USB_HID
+static void pad_map_load(void)
+{
+    char key[16];
+    for (int i = 0; i < PAD_MAP_BUTTONS; ++i)
+    {
+        snprintf(key, sizeof(key), "PadMap%d", i);
+        double value = rg_settings_get_number(NS_GLOBAL, key, -1);
+        if (value >= 0 && pad_map_key_is_valid((uint32_t)value))
+            pad_map.keys[i] = (uint32_t)value;
+    }
+}
+
+static void pad_map_save(int button)
+{
+    char key[16];
+    snprintf(key, sizeof(key), "PadMap%d", button);
+    rg_settings_set_number(NS_GLOBAL, key, pad_map.keys[button]);
+}
+#endif
+
+int rg_input_pad_button_count(void)
+{
+#ifdef RG_GAMEPAD_USB_HID
+    return PAD_MAP_BUTTONS;
+#else
+    return 0;
+#endif
+}
+
+const char *rg_input_pad_button_label(int button)
+{
+#ifdef RG_GAMEPAD_USB_HID
+    return pad_map_button_label(button);
+#else
+    return "";
+#endif
+}
+
+rg_key_t rg_input_pad_get_key(int button)
+{
+#ifdef RG_GAMEPAD_USB_HID
+    return (button >= 0 && button < PAD_MAP_BUTTONS) ? pad_map.keys[button] : 0;
+#else
+    return 0;
+#endif
+}
+
+void rg_input_pad_cycle_key(int button, int direction)
+{
+#ifdef RG_GAMEPAD_USB_HID
+    if (button < 0 || button >= PAD_MAP_BUTTONS)
+        return;
+    pad_map.keys[button] = pad_map_next_key(pad_map.keys[button], direction);
+    pad_map_save(button);
+    rg_settings_commit();
+#endif
+}
+
+void rg_input_pad_set_layout(int layout)
+{
+#ifdef RG_GAMEPAD_USB_HID
+    pad_map_set_layout(&pad_map, layout);
+    for (int i = 0; i < 4; ++i) // Only the face buttons depend on the layout
+        pad_map_save(i);
+    rg_settings_commit();
+#endif
+}
+
+void rg_input_pad_reset(void)
+{
+#ifdef RG_GAMEPAD_USB_HID
+    char key[16];
+    pad_map_defaults(&pad_map);
+    for (int i = 0; i < PAD_MAP_BUTTONS; ++i)
+    {
+        snprintf(key, sizeof(key), "PadMap%d", i);
+        rg_settings_delete(NS_GLOBAL, key);
+    }
+    rg_settings_commit();
+#endif
+}
+
+// Bluetooth controllers: 0 = off, 1 = on, 2 = pair a new controller
+int rg_input_bt_get_mode(void)
+{
+#ifdef RG_GAMEPAD_BLE_HID
+    return rg_ble_pad_get_mode();
+#else
+    return 0;
+#endif
+}
+
+void rg_input_bt_set_mode(int mode)
+{
+#ifdef RG_GAMEPAD_BLE_HID
+    rg_ble_pad_set_mode(mode);
+#endif
+}
+
+const char *rg_input_bt_status(void)
+{
+#ifdef RG_GAMEPAD_BLE_HID
+    return rg_ble_pad_status();
+#else
+    return "";
+#endif
+}
+
+static int touch_ui_depth = 0;
+
+void rg_input_touch_ui_enter(void)
+{
+    touch_ui_depth++;
+}
+
+void rg_input_touch_ui_leave(void)
+{
+    if (touch_ui_depth > 0)
+        touch_ui_depth--;
+}
+
+bool rg_input_touch_ui_active(void)
+{
+    return touch_ui_depth > 0 || rg_system_get_app()->isLauncher;
+}
+
+static int touch_raw_depth = 0;
+
+void rg_input_touch_raw_enter(void)
+{
+    touch_raw_depth++;
+}
+
+void rg_input_touch_raw_leave(void)
+{
+    if (touch_raw_depth > 0)
+        touch_raw_depth--;
+}
+
+bool rg_input_touch_raw_active(void)
+{
+    return touch_raw_depth > 0;
+}
+
+bool rg_input_read_touch(int *x, int *y)
+{
+#ifdef RG_TOUCH_ST712X
+    return rg_touch_get_point(x, y);
+#else
+    return false;
+#endif
 }
 
 bool rg_input_key_is_present(rg_key_t mask)

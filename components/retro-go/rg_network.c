@@ -36,6 +36,14 @@
 #define esp_sntp_setservername sntp_setservername
 #endif
 
+// Called by the SNTP client (tcpip thread) each time the system time has been updated from the network
+static void sntp_sync_callback(struct timeval *tv)
+{
+    RG_LOGI("Time synchronized with NTP server");
+    // Store it right away, to the RTC if the target has one, instead of waiting for the system loop to notice
+    rg_system_save_time();
+}
+
 static rg_network_state_t network_state = RG_NETWORK_DISABLED;
 static rg_wifi_config_t wifi_config = {0};
 static esp_netif_t *netif_sta, *netif_ap, *netif;
@@ -178,7 +186,11 @@ bool rg_network_wifi_set_config(const rg_wifi_config_t *config)
 bool rg_network_wifi_start(void)
 {
 #ifdef RG_ENABLE_NETWORKING
-    RG_ASSERT(network_state > RG_NETWORK_DISABLED, "Please call rg_network_init() first");
+    if (network_state <= RG_NETWORK_DISABLED) // rg_network_init() failed or wasn't called, e.g. no Wi-Fi hardware
+    {
+        RG_LOGW("Can't start wifi: the network stack isn't initialized.\n");
+        return false;
+    }
     wifi_config_t config = {0};
     esp_err_t err;
 
@@ -219,7 +231,8 @@ fail:
 void rg_network_wifi_stop(void)
 {
 #ifdef RG_ENABLE_NETWORKING
-    RG_ASSERT(network_state > RG_NETWORK_DISABLED, "Please call rg_network_init() first");
+    if (network_state <= RG_NETWORK_DISABLED)
+        return;
     esp_wifi_stop();
     netif = NULL;
 #endif
@@ -266,6 +279,16 @@ bool rg_network_init(void)
 #ifdef RG_ENABLE_NETWORKING
     if (network_state > RG_NETWORK_DISABLED)
         return true;
+
+#ifdef RG_TARGET_NETWORK_PREPARE
+    // Some targets need to bring up the radio first (for example a Wi-Fi co-processor)
+    if (!RG_TARGET_NETWORK_PREPARE())
+    {
+        RG_LOGE("Wi-Fi is not available on this device");
+        return false;
+    }
+#endif
+
     network_state = RG_NETWORK_DISCONNECTED;
 
     // Init event loop first
@@ -294,6 +317,7 @@ bool rg_network_init(void)
     // Setup SNTP client but don't query it yet
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, "pool.ntp.org");
+    sntp_set_time_sync_notification_cb(sntp_sync_callback);
     // esp_sntp_init();
 
     // Load the user's chosen config profile, if any

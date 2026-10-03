@@ -1,11 +1,23 @@
-set(COMPONENT_SRCDIRS ". drivers/audio fonts libs/netplay libs/lodepng")
+set(COMPONENT_SRCDIRS ". drivers/audio drivers/board drivers/input fonts libs/netplay libs/lodepng")
 set(COMPONENT_ADD_INCLUDEDIRS ". libs/netplay libs/lodepng")
-if((IDF_VERSION_MAJOR EQUAL 5) AND (IDF_VERSION_MINOR GREATER 2)) # esp-idf 5.3+
+if(IDF_VERSION_MAJOR GREATER 5) # cJSON was removed from esp-idf 6.0 core, use the bundled copy
+    list(APPEND COMPONENT_SRCDIRS "libs/cJSON")
+    list(APPEND COMPONENT_ADD_INCLUDEDIRS "libs/cJSON")
+endif()
+if(IDF_VERSION_MAJOR GREATER 5) # esp-idf 6.0+ (legacy drivers and esp_adc_cal were removed)
+    set(COMPONENT_REQUIRES "spi_flash fatfs app_update nvs_flash esp_adc esp_timer esp_psram esp_wifi esp_http_client esp_driver_ledc esp_driver_gpio esp_driver_spi esp_driver_i2s esp_driver_i2c esp_driver_sdmmc esp_driver_sdspi driver")
+elseif((IDF_VERSION_MAJOR EQUAL 5) AND (IDF_VERSION_MINOR GREATER 2)) # esp-idf 5.3+
     set(COMPONENT_REQUIRES "spi_flash fatfs app_update json nvs_flash esp_adc esp_timer esp_psram esp_wifi esp_http_client esp_driver_ledc driver")
 elseif(IDF_VERSION_MAJOR EQUAL 5) # esp-idf 5.0 - 5.2
     set(COMPONENT_REQUIRES "spi_flash fatfs app_update json nvs_flash esp_adc esp_timer esp_psram esp_wifi esp_http_client")
 else() # esp-idf 4.1 - 4.4
     set(COMPONENT_REQUIRES "spi_flash fatfs app_update esp_adc_cal json nvs_flash esp_wifi esp_http_client")
+endif()
+
+# Targets with a MIPI-DSI display, touch, codecs and USB host (see idf_component.yml)
+if(IDF_TARGET STREQUAL "esp32p4")
+    list(APPEND COMPONENT_REQUIRES esp_lcd esp_driver_ppa esp_driver_ledc esp_driver_i2c esp_driver_i2s esp_mm esp_pm
+         espressif__esp_lcd_st7121 espressif__esp_lcd_st7123 espressif__esp_lcd_touch_st7123 espressif__esp_codec_dev espressif__usb_host_hid espressif__esp_hosted bt esp_hid nvs_flash)
 endif()
 
 register_component()

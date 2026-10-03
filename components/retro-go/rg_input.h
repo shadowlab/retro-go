@@ -90,6 +90,33 @@ typedef struct
 
 void rg_input_init(void);
 void rg_input_deinit(void);
+// Touch gestures only drive the UI while a dialog is open (or in the launcher). Elsewhere touch is
+// restricted to the menu hot corner so that stray touches don't press game buttons.
+void rg_input_touch_ui_enter(void);
+void rg_input_touch_ui_leave(void);
+bool rg_input_touch_ui_active(void);
+// Raw touch (targets with a touch screen): while enabled, touches are not turned into key presses and the UI reads the
+// position with rg_input_read_touch() instead. For on-screen keyboards. Calls nest.
+void rg_input_touch_raw_enter(void);
+void rg_input_touch_raw_leave(void);
+bool rg_input_touch_raw_active(void);
+// True while a finger is down (or for a tap that has just ended), x/y in logical screen coordinates. Always false on
+// targets without touch.
+bool rg_input_read_touch(int *x, int *y);
+// Button mapping of external controllers (targets with RG_GAMEPAD_USB_HID). Buttons are numbered from 0 in the order of
+// rg_input_pad_button_label(), the key is 0 when a button does nothing. Changes are saved. Layout 0 = positional
+// (Nintendo), 1 = Xbox labels.
+int rg_input_pad_button_count(void); // 0 if the target has no external controllers
+const char *rg_input_pad_button_label(int button);
+rg_key_t rg_input_pad_get_key(int button);
+void rg_input_pad_cycle_key(int button, int direction);
+void rg_input_pad_set_layout(int layout);
+void rg_input_pad_reset(void);
+
+// Bluetooth LE controllers (targets with RG_GAMEPAD_BLE_HID): mode 0 = off, 1 = on, 2 = pairing
+int rg_input_bt_get_mode(void);
+void rg_input_bt_set_mode(int mode);
+const char *rg_input_bt_status(void);
 bool rg_input_key_is_present(rg_key_t mask);
 bool rg_input_key_is_pressed(rg_key_t mask);
 bool rg_input_wait_for_key(rg_key_t mask, bool pressed, int timeout_ms);

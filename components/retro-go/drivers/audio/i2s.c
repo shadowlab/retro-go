@@ -10,7 +10,21 @@
 #endif
 
 #include <driver/gpio.h>
+#include <esp_idf_version.h>
+
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+#include <driver/i2s_std.h>
+#define USE_NEW_I2S_DRIVER 1 // The legacy driver/i2s.h was removed in esp-idf 6.0
+static i2s_chan_handle_t tx_chan;
+#ifdef RG_AUDIO_CODEC_ES8388
+#include <esp_codec_dev.h>
+#include <esp_codec_dev_defaults.h>
+#include <es8388_codec.h>
+static esp_codec_dev_handle_t codec_dev;
+#endif
+#else
 #include <driver/i2s.h>
+#endif
 
 #ifdef RG_GPIO_SND_AMP_ENABLE_INVERT
 #define MUTE_ENABLE 1
@@ -33,6 +47,44 @@ static struct {
     bool muted;
 } state;
 
+#ifdef RG_AUDIO_CODEC_ES8388
+// The ES8388 is a slave on the I2S bus (MCLK = 256 * fs from the ESP32) and is configured over I2C.
+// esp_codec_dev takes care of the DAC/mixer/output setup. We only use it as a DAC, volume is done in software.
+static bool codec_open(int sample_rate)
+{
+    if (!codec_dev)
+    {
+        audio_codec_i2s_cfg_t i2s_cfg = {.port = I2S_NUM_0, .tx_handle = tx_chan};
+        const audio_codec_data_if_t *data_if = audio_codec_new_i2s_data(&i2s_cfg);
+        audio_codec_i2c_cfg_t i2c_cfg = {
+            .port = 0,
+            .addr = ES8388_CODEC_DEFAULT_ADDR,
+            .bus_handle = rg_i2c_get_bus_handle(),
+        };
+        const audio_codec_ctrl_if_t *ctrl_if = audio_codec_new_i2c_ctrl(&i2c_cfg);
+        es8388_codec_cfg_t codec_cfg = {
+            .codec_mode = ESP_CODEC_DEV_WORK_MODE_DAC,
+            .master_mode = false,
+            .ctrl_if = ctrl_if,
+            .pa_pin = -1, // the amplifier is enabled by an IO expander, see rg_tab5_init()
+        };
+        const audio_codec_if_t *codec_if = es8388_codec_new(&codec_cfg);
+        if (!data_if || !ctrl_if || !codec_if)
+            return false;
+        esp_codec_dev_cfg_t dev_cfg = {.dev_type = ESP_CODEC_DEV_TYPE_OUT, .codec_if = codec_if, .data_if = data_if};
+        codec_dev = esp_codec_dev_new(&dev_cfg);
+        if (!codec_dev)
+            return false;
+    }
+    esp_codec_dev_sample_info_t fs = {.sample_rate = sample_rate, .channel = 2, .bits_per_sample = 16};
+    esp_codec_dev_close(codec_dev);
+    if (esp_codec_dev_open(codec_dev, &fs) != ESP_CODEC_DEV_OK)
+        return false;
+    esp_codec_dev_set_out_vol(codec_dev, 100);
+    return true;
+}
+#endif
+
 static bool driver_init(int device, int sample_rate)
 {
     state.last_error = NULL;
@@ -40,7 +92,9 @@ static bool driver_init(int device, int sample_rate)
 
     if (state.device == 0)
     {
-    #if RG_AUDIO_USE_INT_DAC
+    #if RG_AUDIO_USE_INT_DAC && USE_NEW_I2S_DRIVER
+        state.last_error = "Internal DAC mode is not supported with esp-idf 6.0+!";
+    #elif RG_AUDIO_USE_INT_DAC
         esp_err_t ret = i2s_driver_install(I2S_NUM_0, &(i2s_config_t){
             .mode = I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN,
             .sample_rate = sample_rate,
@@ -62,6 +116,38 @@ static bool driver_init(int device, int sample_rate)
     else if (state.device == 1)
     {
     #if RG_AUDIO_USE_EXT_DAC
+    #if USE_NEW_I2S_DRIVER
+        i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
+        chan_cfg.dma_desc_num = DMA_BUFFER_COUNT;
+        chan_cfg.dma_frame_num = DMA_BUFFER_LEN;
+        chan_cfg.auto_clear = true;
+        esp_err_t ret = i2s_new_channel(&chan_cfg, &tx_chan, NULL);
+        if (ret == ESP_OK)
+        {
+            i2s_std_config_t std_cfg = {
+                .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(sample_rate),
+                .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
+                .gpio_cfg = {
+#ifdef RG_GPIO_SND_I2S_MCLK
+                    .mclk = RG_GPIO_SND_I2S_MCLK,
+#else
+                    .mclk = I2S_GPIO_UNUSED,
+#endif
+                    .bclk = RG_GPIO_SND_I2S_BCK,
+                    .ws = RG_GPIO_SND_I2S_WS,
+                    .dout = RG_GPIO_SND_I2S_DATA,
+                    .din = I2S_GPIO_UNUSED,
+                },
+            };
+            ret = i2s_channel_init_std_mode(tx_chan, &std_cfg);
+            if (ret == ESP_OK)
+                ret = i2s_channel_enable(tx_chan);
+        #ifdef RG_AUDIO_CODEC_ES8388
+            if (ret == ESP_OK && !codec_open(sample_rate))
+                state.last_error = "ES8388 codec init failed";
+        #endif
+        }
+    #else
         esp_err_t ret = i2s_driver_install(I2S_NUM_0, &(i2s_config_t){
             .mode = I2S_MODE_MASTER | I2S_MODE_TX,
             .sample_rate = sample_rate,
@@ -85,6 +171,7 @@ static bool driver_init(int device, int sample_rate)
                 .data_in_num = GPIO_NUM_NC
             });
         }
+    #endif
         if (ret != ESP_OK)
             state.last_error = esp_err_to_name(ret);
     #else
@@ -101,15 +188,44 @@ static bool driver_init(int device, int sample_rate)
 
 static bool driver_set_sample_rates(int sampleRate)
 {
+#if USE_NEW_I2S_DRIVER
+    i2s_std_clk_config_t clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(sampleRate);
+    if (i2s_channel_disable(tx_chan) != ESP_OK)
+        return false;
+    esp_err_t ret = i2s_channel_reconfig_std_clock(tx_chan, &clk_cfg);
+    bool ok = i2s_channel_enable(tx_chan) == ESP_OK && ret == ESP_OK;
+#ifdef RG_AUDIO_CODEC_ES8388
+    ok = ok && codec_open(sampleRate);
+#endif
+    return ok;
+#else
     return i2s_set_sample_rates(I2S_NUM_0, sampleRate) == ESP_OK;
+#endif
 }
 
 static bool driver_deinit(void)
 {
+#ifdef RG_AUDIO_CODEC_ES8388
+    if (codec_dev)
+    {
+        esp_codec_dev_close(codec_dev);
+        esp_codec_dev_delete(codec_dev);
+        codec_dev = NULL;
+    }
+#endif
+#if USE_NEW_I2S_DRIVER
+    if (tx_chan)
+    {
+        i2s_channel_disable(tx_chan);
+        i2s_del_channel(tx_chan);
+        tx_chan = NULL;
+    }
+#else
     i2s_driver_uninstall(I2S_NUM_0);
+#endif
     if (state.device == 0)
     {
-    #if RG_AUDIO_USE_INT_DAC
+    #if RG_AUDIO_USE_INT_DAC && !USE_NEW_I2S_DRIVER
         i2s_set_dac_mode(I2S_DAC_CHANNEL_DISABLE);
     #endif
     }
@@ -179,7 +295,11 @@ static bool driver_submit(const rg_audio_frame_t *frames, size_t count)
         if (i == count - 1 || ++pos == RG_COUNT(buffer))
         {
             size_t written;
+        #if USE_NEW_I2S_DRIVER
+            if (i2s_channel_write(tx_chan, (void *)buffer, pos * 4, &written, 1000) != ESP_OK)
+        #else
             if (i2s_write(I2S_NUM_0, (void *)buffer, pos * 4, &written, 1000) != ESP_OK)
+        #endif
                 RG_LOGW("I2S Submission error! Written: %d/%d\n", written, pos * 4);
             pos = 0;
         }
@@ -189,7 +309,17 @@ static bool driver_submit(const rg_audio_frame_t *frames, size_t count)
 
 static bool driver_set_mute(bool mute)
 {
+#ifdef RG_AUDIO_CODEC_ES8388
+    if (codec_dev)
+        esp_codec_dev_set_out_mute(codec_dev, mute);
+#endif
+#if USE_NEW_I2S_DRIVER
+    // No zero_dma_buffer in the new driver, restarting the channel clears the buffers (auto_clear)
+    i2s_channel_disable(tx_chan);
+    i2s_channel_enable(tx_chan);
+#else
     i2s_zero_dma_buffer(I2S_NUM_0);
+#endif
     #ifdef RG_GPIO_SND_AMP_ENABLE
     gpio_set_level(RG_GPIO_SND_AMP_ENABLE, mute ? MUTE_ENABLE : MUTE_DISABLE);
     #endif

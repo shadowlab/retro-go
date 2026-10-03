@@ -5,6 +5,8 @@
 #include <stddef.h>
 
 bool rg_i2c_init(void);
+// With the master driver (esp-idf 6.0+ or RG_I2C_USE_MASTER_DRIVER) returns the i2c_master_bus_handle_t, NULL otherwise.
+void *rg_i2c_get_bus_handle(void);
 bool rg_i2c_deinit(void);
 bool rg_i2c_read(uint8_t addr, int reg, void *read_data, size_t read_len);
 bool rg_i2c_write(uint8_t addr, int reg, const void *write_data, size_t write_len);

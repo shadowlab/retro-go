@@ -45,7 +45,7 @@ typedef struct
 typedef struct
 {
     int32_t totalFrames, fullFrames, partFrames, ticks;
-    int64_t busyTime, updateTime;
+    int64_t busyTime, displayBusyTime, updateTime;
 } counters_t;
 
 struct rg_task_s
@@ -187,6 +187,7 @@ static void update_statistics(void)
     counters.fullFrames = display.fullFrames;
     counters.partFrames = display.partFrames;
     counters.busyTime = statistics.busyTime;
+    counters.displayBusyTime = display.busyTime;
     counters.ticks = statistics.ticks;
     counters.updateTime = statistics.lastTick;
 
@@ -201,6 +202,7 @@ static void update_statistics(void)
         float totalTime = counters.updateTime - previous.updateTime;
         float totalTimeSecs = totalTime / usPerSecond;
         float busyTime = counters.busyTime - previous.busyTime;
+        float displayBusyTime = counters.displayBusyTime - previous.displayBusyTime;
         float ticks = counters.ticks - previous.ticks;
         float fullFrames = counters.fullFrames - previous.fullFrames;
         float partFrames = counters.partFrames - previous.partFrames;
@@ -214,6 +216,7 @@ static void update_statistics(void)
         statistics.fullFPS = fullFrames / totalTimeSecs;
         statistics.partialFPS = partFrames / totalTimeSecs;
         statistics.busyPercent = busyTime / totalTime * 100.f;
+        statistics.displayBusyPercent = displayBusyTime / totalTime * 100.f;
         statistics.speedPercent = app.tickRate > 0 ? (statistics.totalFPS / app.tickRate * 100.f) : 100.f;
     }
     statistics.uptime = rg_system_timer() / 1000000;
@@ -262,13 +265,14 @@ static void system_monitor_task(void *arg)
         update_indicators(false);
 
         // Try to avoid complex conversions that could allocate, prefer rounding/ceiling if necessary.
-        rg_system_log(RG_LOG_DEBUG, NULL, "STACK:%d, HEAP:%d+%d (%d+%d), BUSY:%d%%, FPS:%d (S:%d R:%d+%d), BATT:%d",
+        rg_system_log(RG_LOG_DEBUG, NULL, "STACK:%d, HEAP:%d+%d (%d+%d), BUSY:%d%%, DISP:%d%%, FPS:%d (S:%d R:%d+%d), BATT:%d",
             statistics.freeStackMain,
             statistics.freeMemoryInt / 1024,
             statistics.freeMemoryExt / 1024,
             statistics.freeBlockInt / 1024,
             statistics.freeBlockExt / 1024,
             (int)roundf(statistics.busyPercent),
+            (int)roundf(statistics.displayBusyPercent),
             (int)roundf(statistics.totalFPS),
             (int)roundf(statistics.skippedFPS),
             (int)roundf(statistics.partialFPS),
@@ -456,6 +460,10 @@ rg_app_t *rg_system_init(int sampleRate, const rg_handlers_t *handlers, void *_u
 #ifdef RG_I2C_GPIO_DRIVER
     rg_i2c_init();
     rg_i2c_gpio_init();
+#endif
+
+#ifdef RG_TARGET_INIT
+    RG_TARGET_INIT(); // Board specific initialization that must happen before the storage, display and audio
 #endif
 
     rg_storage_init();
@@ -755,19 +763,21 @@ bool rg_mutex_take(rg_mutex_t *mutex, int timeoutMS)
 void rg_system_load_time(void)
 {
     time_t time_sec = RG_MAX(rtcValue, RG_BUILD_TIME);
-#if 0
-    if (rg_i2c_read(0x68, 0x00, data, sizeof(data)))
-    {
-        RG_LOGI("Time loaded from DS3231\n");
-    }
-    else
-#endif
     void *data_ptr = (void *)&time_sec;
     size_t data_len = sizeof(time_sec);
     if (rg_storage_read_file(RG_BASE_PATH_CACHE "/clock.bin", &data_ptr, &data_len, RG_FILE_USER_BUFFER))
     {
         RG_LOGI("Time loaded from storage\n");
     }
+#ifdef RG_TARGET_RTC_READ
+    // A battery backed clock is more accurate than the file, which is only updated when we get to save it
+    time_t rtc_time;
+    if (RG_TARGET_RTC_READ(&rtc_time) && rtc_time >= RG_BUILD_TIME)
+    {
+        RG_LOGI("Time loaded from RTC\n");
+        time_sec = rtc_time;
+    }
+#endif
 #ifdef ESP_PLATFORM
     settimeofday(&(struct timeval){time_sec, 0}, NULL);
 #endif
@@ -783,10 +793,10 @@ void rg_system_save_time(void)
     {
         RG_LOGI("System time saved to storage.\n");
     }
-#if 0
-    if (rg_i2c_write(0x68, 0x00, data, sizeof(data)))
+#ifdef RG_TARGET_RTC_WRITE
+    if (RG_TARGET_RTC_WRITE(time_sec))
     {
-        RG_LOGI("System time saved to DS3231.\n");
+        RG_LOGI("System time saved to RTC.\n");
     }
 #endif
 }

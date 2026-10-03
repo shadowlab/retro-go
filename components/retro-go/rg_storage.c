@@ -12,7 +12,13 @@
 #define SDCARD_DO_TRANSACTION sdspi_host_do_transaction
 #elif defined(RG_STORAGE_SDMMC_HOST)
 #include <driver/sdmmc_host.h>
+#ifdef RG_STORAGE_SDMMC_LDO_CHAN
+#include <sd_pwr_ctrl_by_on_chip_ldo.h>
+#endif
 #define SDCARD_DO_TRANSACTION sdmmc_host_do_transaction
+#ifndef RG_STORAGE_SDMMC_WIDTH
+#define RG_STORAGE_SDMMC_WIDTH 1 // 1 or 4 data lines
+#endif
 #endif
 
 #ifdef ESP_PLATFORM
@@ -121,19 +127,43 @@ void rg_storage_init(void)
     RG_LOGI("Looking for SD Card using SDMMC...");
 
     sdmmc_host_t host_config = SDMMC_HOST_DEFAULT();
-    host_config.flags = SDMMC_HOST_FLAG_1BIT;
+#if RG_STORAGE_SDMMC_WIDTH == 4
+    host_config.flags = SDMMC_HOST_FLAG_4BIT | (host_config.flags & SDMMC_HOST_FLAG_DEINIT_ARG);
+#else
+    host_config.flags = SDMMC_HOST_FLAG_1BIT | (host_config.flags & SDMMC_HOST_FLAG_DEINIT_ARG);
+#endif
     host_config.slot = RG_STORAGE_SDMMC_HOST;
     host_config.max_freq_khz = RG_STORAGE_SDMMC_SPEED;
     host_config.do_transaction = &sdcard_do_transaction;
 
+#ifdef RG_STORAGE_SDMMC_LDO_CHAN
+    // On some chips (ESP32-P4) the SDMMC IO power comes from an on-chip LDO channel that must be enabled. The driver then
+    // sets its voltage from host_config.io_voltage (3.3V by default) before talking to the card.
+    static sd_pwr_ctrl_handle_t sdmmc_pwr_ctrl_handle = NULL;
+    if (!sdmmc_pwr_ctrl_handle)
+    {
+        const sd_pwr_ctrl_ldo_config_t ldo_config = {.ldo_chan_id = RG_STORAGE_SDMMC_LDO_CHAN};
+        esp_err_t ldo_err = sd_pwr_ctrl_new_on_chip_ldo(&ldo_config, &sdmmc_pwr_ctrl_handle);
+        if (ldo_err != ESP_OK)
+            RG_LOGE("Failed to enable the on-chip LDO %d for the SD card (0x%x)", RG_STORAGE_SDMMC_LDO_CHAN, ldo_err);
+    }
+    host_config.pwr_ctrl_handle = sdmmc_pwr_ctrl_handle;
+#endif
+
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-    slot_config.width = 1;
+    slot_config.width = RG_STORAGE_SDMMC_WIDTH;
 #if SOC_SDMMC_USE_GPIO_MATRIX
     slot_config.clk = RG_GPIO_SDSPI_CLK;
     slot_config.cmd = RG_GPIO_SDSPI_CMD;
     slot_config.d0 = RG_GPIO_SDSPI_D0;
+#if RG_STORAGE_SDMMC_WIDTH == 4
+    slot_config.d1 = RG_GPIO_SDSPI_D1;
+    slot_config.d2 = RG_GPIO_SDSPI_D2;
+    slot_config.d3 = RG_GPIO_SDSPI_D3;
+#else
     // d1 and d3 normally not used in width=1 but sdmmc_host_init_slot saves them, so just in case
     slot_config.d1 = slot_config.d3 = -1;
+#endif
 #endif
 
     esp_vfs_fat_mount_config_t mount_config = {

@@ -8,6 +8,10 @@ static void lcd_deinit(void)
 {
 }
 
+static void lcd_set_window(int left, int top, int width, int height)
+{
+}
+
 static void lcd_set_backlight(float percent)
 {
 }
