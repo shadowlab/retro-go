@@ -29,7 +29,7 @@ Requirements and caveats:
 |---|---|
 | Display | ST7121 (ST7123 is not tested) over 2-lane MIPI-DSI, 70 MHz pixel clock, double buffered RGB565. `drivers/display/mipi_dsi.h` |
 | Scaling | Emulators draw to a 424x240 canvas, the PPA scales it 3x and rotates it to landscape (270 degrees CCW, an assumption to verify) |
-| Touch | ST7123/ST7121 touch controller (I2C 0x55). Gestures drive the menus: drag = d-pad, tap = A, long press = B. In game only the top-left corner (MENU) reacts. `drivers/input/touch_st712x.c` |
+| Touch | ST7123/ST7121 touch controller (I2C 0x55). Gestures drive the menus: drag = d-pad, tap = A, long press = B. In game only the top-left corner (MENU) reacts. The on-screen keyboard reads touch positions directly, see below. `drivers/input/touch_st712x.c` |
 | USB gamepads | USB-A host (5 V from the IO expander). HID gamepads/joysticks and boot keyboards, hot-plug, up to 4 devices merged. `drivers/input/usb_gamepad.c` |
 | Audio | ES8388 codec over I2S (MCLK on GPIO30), configured through `esp_codec_dev`. Volume is done in software |
 | Wi-Fi | ESP32-C6 co-processor through ESP-Hosted (SDIO, SDMMC slot 1, reset on GPIO15), see below |
@@ -146,9 +146,20 @@ core 0 is left to the emulator. No core splits the emulation itself across both 
 chips or the SNES renderer on core 1): that needs profiling on the device and careful synchronization, and is the
 most promising change if a core turns out to be too slow, most likely snes9x.
 
+## On-screen keyboard
+
+The keyboard of `rg_gui_input_str()` (Wi-Fi name and password) is usable by touch. While it is open, touch gestures are
+switched off (`rg_input_touch_raw_enter()`) and the keyboard reads positions with `rg_input_read_touch()`: the key under
+the finger is highlighted, a key is typed when the finger lifts (slide to another key to change it), and a button row
+under the keys has layout switch, SPACE, DEL, CANCEL and OK. The keys are 28 instead of 20 logical pixels tall (84 instead of 60 on the panel, to get closer to the roughly
+7 mm a fingertip needs) and the usual hint line is replaced by the buttons.
+A gamepad still works as before. `rg_gui_input_char()` (ColecoVision keypad) also reads taps: a tap on a key returns it,
+a tap elsewhere cancels. This is switched on for the target by `RG_GUI_TOUCH_KEYBOARD` in `config.h`, other targets keep
+the old keyboard. The hit testing is `drivers/input/touch_keyboard.c` (host-tested); the layout and the touch
+handling are compile-checked only.
+
 ## Not done
 
-Bluetooth Classic pads (not possible with the C6), touch in the on-screen
-keyboard, and a tap-on-row menu selection.
+Bluetooth Classic pads (not possible with the C6) and a tap-on-row menu selection.
 
 The microphone (ES7210) is not used by Retro-Go and isn't planned.

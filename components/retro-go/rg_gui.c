@@ -1,4 +1,5 @@
 #include "rg_system.h"
+#include "drivers/input/touch_keyboard.h"
 #include "rg_gui.h"
 
 #include <cJSON.h>
@@ -1107,17 +1108,90 @@ cleanup:
     return filepath;
 }
 
+// On targets with RG_GUI_TOUCH_KEYBOARD the keys are taller (a fingertip is about 7 mm) and the keyboard has a row
+// of buttons, since such targets may have no hardware buttons for backspace, layout switch, OK and cancel.
+#ifdef RG_GUI_TOUCH_KEYBOARD
+#define KB_KEY_HEIGHT 28
+#define KB_BUTTON_HEIGHT 28
+#else
+#define KB_KEY_HEIGHT 20
+#define KB_BUTTON_HEIGHT 0
+#endif
+
+// Top of the text of a key or button, centred when it is taller than the classic 20 pixels
+static int kb_text_y(int y, int height)
+{
+    return (height > 20) ? y + (height - (gui.font_height + 2)) / 2 : y + 2;
+}
+
+static tkb_target_t kb_pressed_button = TKB_NONE; // for drawing the button under the finger as selected
+
+// Geometry of the keyboard of rg_gui_input_str(): the input box sits above it
+static tkb_geometry_t kb_input_geometry(const rg_keyboard_layout_t *layout)
+{
+    tkb_geometry_t g = {
+        .key_w = gui.screen_width / 10 - 4,
+        .key_h = KB_KEY_HEIGHT,
+        .columns = layout->columns,
+        .rows = layout->rows,
+        .button_h = KB_BUTTON_HEIGHT,
+    };
+    g.x = (gui.screen_width - g.columns * g.key_w) / 2;
+    g.y = gui.screen_height - g.rows * g.key_h - g.button_h - (g.button_h ? 8 : 40);
+    return g;
+}
+
+// Geometry of the keyboard of rg_gui_input_char() and rg_gui_draw_virtual_keyboard(), no buttons
+static tkb_geometry_t kb_virtual_geometry(int x_pos, int y_pos, const rg_keyboard_layout_t *layout)
+{
+    tkb_geometry_t g = {
+        .key_w = gui.screen_width / 10 - 4,
+        .key_h = KB_KEY_HEIGHT,
+        .columns = layout->columns,
+        .rows = layout->rows,
+        .button_h = 0,
+    };
+    g.x = get_horizontal_position(x_pos, g.columns * g.key_w);
+    g.y = get_vertical_position(y_pos, g.rows * g.key_h);
+    return g;
+}
+
+static void kb_draw_buttons(const tkb_geometry_t *g, const rg_keyboard_layout_t *layout)
+{
+    static const struct
+    {
+        tkb_target_t target;
+        const char *label;
+    } buttons[] = {
+        {TKB_LAYOUT, NULL}, {TKB_SPACE, "SPACE"}, {TKB_BACKSPACE, "DEL"}, {TKB_CANCEL, "CANCEL"}, {TKB_OK, "OK"},
+    };
+
+    for (size_t i = 0; i < RG_COUNT(buttons); ++i)
+    {
+        int x, y, w, h;
+        if (!tkb_button_rect(g, buttons[i].target, &x, &y, &w, &h))
+            continue;
+
+        bool pressed = kb_pressed_button == buttons[i].target;
+        rg_color_t bg_color = pressed ? gui.style.item_standard : gui.style.box_background;
+        rg_color_t fg_color = pressed ? gui.style.box_background : gui.style.item_standard;
+        rg_color_t border_color = pressed ? gui.style.item_standard : gui.style.box_border;
+
+        rg_gui_draw_rect(x + 1, y + 1, w - 2, h - 2, 1, border_color, bg_color);
+        rg_gui_draw_text(x + 2, kb_text_y(y, h), w - 4, buttons[i].label ?: layout->label, fg_color, bg_color,
+                         RG_TEXT_ALIGN_CENTER);
+    }
+}
+
 void rg_gui_draw_input_screen(const char *title, const char *message, const char *input_buffer,
                               const rg_keyboard_layout_t *current_layout, int cursor_pos, bool partial_redraw)
 {
-    const int key_width = gui.screen_width / 10 - 4;
-    const int key_height = 20;
-    const int keyboard_width = current_layout->columns * key_width;
-    const int keyboard_height = current_layout->rows * key_height;
-    const int keyboard_x = (gui.screen_width - keyboard_width) / 2;
-    const int keyboard_y = gui.screen_height - keyboard_height - 40;
+    const tkb_geometry_t g = kb_input_geometry(current_layout);
+    const int keyboard_width = g.columns * g.key_w;
+    const int keyboard_x = g.x;
+    const int keyboard_y = g.y;
     const int input_box_height = 30;
-    const int input_box_y = keyboard_y - input_box_height - 10;
+    const int input_box_y = keyboard_y - input_box_height - (g.button_h ? 6 : 10);
     char text_buffer[200];
 
     if (!input_buffer)
@@ -1139,9 +1213,12 @@ void rg_gui_draw_input_screen(const char *title, const char *message, const char
         // Draw input box with same styling as dialog
         rg_gui_draw_rect(keyboard_x, input_box_y, keyboard_width, input_box_height, 2, gui.style.box_border, C_WHITE);
 
-        // Draw instructions at bottom like dialog
-        snprintf(text_buffer, sizeof(text_buffer), "A=Type  B=Backspace  SELECT=%3s  START=OK  MENU/OPT=Cancel", current_layout->label);
-        rg_gui_draw_text(0, gui.screen_height - 15, gui.screen_width, text_buffer, gui.style.item_message, gui.style.box_background, RG_TEXT_ALIGN_CENTER);
+        // Draw instructions at bottom like dialog (the buttons take their place on touch targets)
+        if (!g.button_h)
+        {
+            snprintf(text_buffer, sizeof(text_buffer), "A=Type  B=Backspace  SELECT=%3s  START=OK  MENU/OPT=Cancel", current_layout->label);
+            rg_gui_draw_text(0, gui.screen_height - 15, gui.screen_width, text_buffer, gui.style.item_message, gui.style.box_background, RG_TEXT_ALIGN_CENTER);
+        }
     }
 
     // Draw input buffer text and blinking cursor
@@ -1152,16 +1229,20 @@ void rg_gui_draw_input_screen(const char *title, const char *message, const char
 
     // Draw keyboard pad
     rg_gui_draw_virtual_keyboard(keyboard_x, keyboard_y, current_layout, cursor_pos, true);
+
+    if (g.button_h)
+        kb_draw_buttons(&g, current_layout);
 }
 
 void rg_gui_draw_virtual_keyboard(int x_pos, int y_pos, const rg_keyboard_layout_t *current_layout, int cursor_pos, bool partial_redraw)
 {
-    const int key_width = gui.screen_width / 10 - 4;
-    const int key_height = 20;
-    const int keyboard_width = current_layout->columns * key_width;
-    const int keyboard_height = current_layout->rows * key_height;
-    const int keyboard_x = get_horizontal_position(x_pos, keyboard_width);
-    const int keyboard_y = get_vertical_position(y_pos, keyboard_height);
+    const tkb_geometry_t g = kb_virtual_geometry(x_pos, y_pos, current_layout);
+    const int key_width = g.key_w;
+    const int key_height = g.key_h;
+    const int keyboard_width = g.columns * g.key_w;
+    const int keyboard_height = g.rows * g.key_h;
+    const int keyboard_x = g.x;
+    const int keyboard_y = g.y;
     const char *layout_ptr = current_layout->layout;
 
     if (!partial_redraw)
@@ -1197,7 +1278,7 @@ void rg_gui_draw_virtual_keyboard(int x_pos, int y_pos, const rg_keyboard_layout
             else
                 rg_utf8_encode(key_str, key);
 
-            rg_gui_draw_text(x + 2, y + 2, key_width - 4, key_str, fg_color, bg_color, RG_TEXT_ALIGN_CENTER);
+            rg_gui_draw_text(x + 2, kb_text_y(y, key_height), key_width - 4, key_str, fg_color, bg_color, RG_TEXT_ALIGN_CENTER);
         }
     }
 }
@@ -1237,13 +1318,48 @@ static const rg_keyboard_layout_t keyboard_layouts[] = {
 
 // TODO: Abstract all the redundant/similar code between rg_gui_input_str and rg_gui_input_char
 
-int rg_gui_input_char(const rg_keyboard_layout_t *map)
+// The character of the key at index idx of a layout
+static int kb_layout_key(const rg_keyboard_layout_t *layout, int idx)
 {
-    if (!map)
-        map = &keyboard_layouts[0];
+    const char *layout_ptr = layout->layout;
+    int key = 0;
+    for (int i = 0; i <= idx; ++i)
+        key = rg_utf8_decode(&layout_ptr);
+    return key;
+}
 
+static void kb_append(char *buffer, int *length, size_t capacity, int codepoint)
+{
+    if (*length < (int)capacity - 4)
+    {
+        *length += rg_utf8_encode(&buffer[*length], codepoint);
+        buffer[*length] = '\0';
+    }
+}
+
+static void kb_backspace(char *buffer, int *length)
+{
+    while (*length > 0)
+    {
+        // Rewind until we find a valid codepoint
+        const char *ptr = &buffer[--(*length)];
+        if (rg_utf8_decode(&ptr) != -1)
+            break;
+    }
+    buffer[*length] = '\0';
+}
+
+static int input_char_impl(const rg_keyboard_layout_t *map)
+{
     int cursor = -1;
     int count = map->columns * map->rows;
+
+#ifdef RG_GUI_TOUCH_KEYBOARD
+    // A tap on a key returns it, a tap anywhere else cancels. A finger that is already down is ignored until it lifts.
+    const tkb_geometry_t geometry = kb_virtual_geometry(RG_GUI_CENTER, RG_GUI_BOTTOM, map);
+    bool touch_armed = false, touch_down = false;
+    tkb_hit_t touch_hit = {TKB_NONE, -1};
+#endif
 
     rg_input_wait_for_key(RG_KEY_ALL, false, 1000);
 
@@ -1256,6 +1372,34 @@ int rg_gui_input_char(const rg_keyboard_layout_t *map)
             return map->layout[cursor];
         if (joystick & RG_KEY_B)
             break;
+
+#ifdef RG_GUI_TOUCH_KEYBOARD
+        int tx, ty;
+        if (rg_input_read_touch(&tx, &ty))
+        {
+            if (touch_armed)
+            {
+                touch_hit = tkb_hit(&geometry, tx, ty);
+                touch_down = true;
+                if (touch_hit.target == TKB_KEY && touch_hit.key != cursor)
+                {
+                    cursor = touch_hit.key;
+                    rg_gui_draw_virtual_keyboard(RG_GUI_CENTER, RG_GUI_BOTTOM, map, cursor, false);
+                }
+            }
+        }
+        else
+        {
+            touch_armed = true;
+            if (touch_down)
+            {
+                touch_down = false;
+                if (touch_hit.target == TKB_KEY)
+                    return kb_layout_key(map, touch_hit.key);
+                break;
+            }
+        }
+#endif
 
         if (joystick & RG_KEY_LEFT)
             cursor--;
@@ -1276,13 +1420,30 @@ int rg_gui_input_char(const rg_keyboard_layout_t *map)
         if (cursor != prev_cursor)
             rg_gui_draw_virtual_keyboard(RG_GUI_CENTER, RG_GUI_BOTTOM, map, cursor, false);
 
+#ifdef RG_GUI_TOUCH_KEYBOARD
+        // Keep polling the touch screen
+        rg_input_wait_for_key(RG_KEY_ALL, false, 500);
+        rg_input_wait_for_key(RG_KEY_ANY, true, 20);
+#else
         rg_input_wait_for_key(RG_KEY_ALL, false, 500);
         rg_input_wait_for_key(RG_KEY_ANY, true, 500);
+#endif
 
         rg_system_tick(0);
     }
 
     return -1;
+}
+
+int rg_gui_input_char(const rg_keyboard_layout_t *map)
+{
+    if (!map)
+        map = &keyboard_layouts[0];
+
+    rg_input_touch_raw_enter();
+    int key = input_char_impl(map);
+    rg_input_touch_raw_leave();
+    return key;
 }
 
 char *rg_gui_input_str(const char *title, const char *message, const char *default_value)
@@ -1307,6 +1468,14 @@ char *rg_gui_input_str(const char *title, const char *message, const char *defau
     uint64_t joystick_last = 0;
     bool redraw = true;
     int redraws = 0;
+
+#ifdef RG_GUI_TOUCH_KEYBOARD
+    // Keys are typed when the finger lifts, on the key it is on then (sliding to another key changes it). A finger
+    // that is already down when the keyboard opens is ignored until it lifts.
+    bool touch_armed = false, touch_down = false;
+    tkb_hit_t touch_hit = {TKB_NONE, -1};
+#endif
+    rg_input_touch_raw_enter();
 
     while (true)
     {
@@ -1346,28 +1515,13 @@ char *rg_gui_input_str(const char *title, const char *message, const char *defau
             }
             else if (joystick & RG_KEY_A)
             {
-                if (input_length < sizeof(input_buffer) - 4)
-                {
-                    const char *layout_ptr = current_layout->layout;
-                    int key = 0;
-                    for (int i = 0; i <= cursor_pos; ++i)
-                        key = rg_utf8_decode(&layout_ptr);
-                    input_length += rg_utf8_encode(&input_buffer[input_length], key);
-                    input_buffer[input_length] = '\0';
-                    redraw = true;
-                }
+                kb_append(input_buffer, &input_length, sizeof(input_buffer), kb_layout_key(current_layout, cursor_pos));
+                redraw = true;
             }
             else if (joystick & RG_KEY_B)
             {
                 // Backspace
-                while (input_length > 0)
-                {
-                    // Rewind until we find a valid codepoint
-                    const char *ptr = &input_buffer[--input_length];
-                    if (rg_utf8_decode(&ptr) != -1)
-                        break;
-                }
-                input_buffer[input_length] = '\0';
+                kb_backspace(input_buffer, &input_length);
                 redraw = true;
             }
             else if (joystick & RG_KEY_SELECT)
@@ -1394,6 +1548,72 @@ char *rg_gui_input_str(const char *title, const char *message, const char *defau
             joystick_last = rg_system_timer();
         }
 
+#ifdef RG_GUI_TOUCH_KEYBOARD
+        int tx, ty;
+        bool finished = false;
+        if (rg_input_read_touch(&tx, &ty))
+        {
+            if (touch_armed)
+            {
+                const tkb_geometry_t geometry = kb_input_geometry(current_layout);
+                touch_hit = tkb_hit(&geometry, tx, ty);
+                touch_down = true;
+
+                const tkb_target_t pressed = (touch_hit.target == TKB_KEY) ? TKB_NONE : touch_hit.target;
+                if (touch_hit.target == TKB_KEY && touch_hit.key != cursor_pos)
+                {
+                    cursor_pos = touch_hit.key;
+                    redraw = true;
+                }
+                if (pressed != kb_pressed_button)
+                {
+                    kb_pressed_button = pressed;
+                    redraw = true;
+                }
+            }
+        }
+        else
+        {
+            touch_armed = true;
+            if (touch_down)
+            {
+                touch_down = false;
+                kb_pressed_button = TKB_NONE;
+                redraw = true;
+
+                switch (touch_hit.target)
+                {
+                case TKB_KEY:
+                    kb_append(input_buffer, &input_length, sizeof(input_buffer), kb_layout_key(current_layout, touch_hit.key));
+                    break;
+                case TKB_SPACE:
+                    kb_append(input_buffer, &input_length, sizeof(input_buffer), ' ');
+                    break;
+                case TKB_BACKSPACE:
+                    kb_backspace(input_buffer, &input_length);
+                    break;
+                case TKB_LAYOUT:
+                    layout_idx = (layout_idx + 1) % RG_COUNT(keyboard_layouts);
+                    current_layout = &keyboard_layouts[layout_idx];
+                    cursor_pos = 0;
+                    redraws = 0;
+                    break;
+                case TKB_CANCEL:
+                    cancelled = true;
+                    finished = true;
+                    break;
+                case TKB_OK:
+                    finished = true;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+        if (finished)
+            break;
+#endif
+
         if (redraw)
         {
             rg_gui_draw_input_screen(title, message, input_buffer, current_layout, cursor_pos, redraws++ > 0);
@@ -1404,6 +1624,8 @@ char *rg_gui_input_str(const char *title, const char *message, const char *defau
         rg_system_tick(0);
     }
 
+    kb_pressed_button = TKB_NONE;
+    rg_input_touch_raw_leave();
     rg_input_wait_for_key(joystick, false, 1000);
     rg_display_force_redraw();
 

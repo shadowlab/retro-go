@@ -95,6 +95,14 @@ void rg_input_deinit(void);
 void rg_input_touch_ui_enter(void);
 void rg_input_touch_ui_leave(void);
 bool rg_input_touch_ui_active(void);
+// Raw touch (targets with a touch screen): while enabled, touches are not turned into key presses and the UI reads the
+// position with rg_input_read_touch() instead. For on-screen keyboards. Calls nest.
+void rg_input_touch_raw_enter(void);
+void rg_input_touch_raw_leave(void);
+bool rg_input_touch_raw_active(void);
+// True while a finger is down (or for a tap that has just ended), x/y in logical screen coordinates. Always false on
+// targets without touch.
+bool rg_input_read_touch(int *x, int *y);
 // Button mapping of external controllers (targets with RG_GAMEPAD_USB_HID). Buttons are numbered from 0 in the order of
 // rg_input_pad_button_label(), the key is 0 when a button does nothing. Changes are saved. Layout 0 = positional
 // (Nintendo), 1 = Xbox labels.

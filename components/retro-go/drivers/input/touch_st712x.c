@@ -11,6 +11,8 @@
 #include <esp_lcd_touch_st7123.h>
 #include <driver/i2c_master.h>
 
+#include <string.h>
+
 #include "touch_gesture.h"
 
 #define PANEL_W 720
@@ -18,6 +20,15 @@
 
 static esp_lcd_touch_handle_t touch;
 static touch_gesture_t gesture;
+
+// Latest sample, see rg_touch_get_point()
+static struct
+{
+    volatile bool down;
+    volatile bool seen;    // the current touch has been returned by rg_touch_get_point()
+    volatile bool pending; // a touch ended without being seen
+    volatile int x, y;
+} last_point;
 
 void rg_touch_init(void)
 {
@@ -77,6 +88,26 @@ uint32_t rg_touch_read(void)
         touching = true;
     }
 
+    if (touching)
+    {
+        last_point.x = x;
+        last_point.y = y;
+        last_point.down = true;
+    }
+    else if (last_point.down)
+    {
+        last_point.down = false;
+        last_point.pending = !last_point.seen;
+        last_point.seen = false;
+    }
+
+    // Raw mode (on-screen keyboard): the caller reads positions, don't also turn them into key presses
+    if (rg_input_touch_raw_active())
+    {
+        memset(&gesture, 0, sizeof(gesture));
+        return 0;
+    }
+
     const touch_keys_t keys = {
         .up = RG_KEY_UP, .down = RG_KEY_DOWN, .left = RG_KEY_LEFT, .right = RG_KEY_RIGHT,
         .a = RG_KEY_A, .b = RG_KEY_B, .menu = RG_KEY_MENU,
@@ -84,7 +115,27 @@ uint32_t rg_touch_read(void)
     return touch_gesture_update(&gesture, &keys, rg_input_touch_ui_active(), touching, x, y, rg_system_timer());
 }
 
+bool rg_touch_get_point(int *x, int *y)
+{
+    if (last_point.down)
+    {
+        last_point.seen = true;
+        *x = last_point.x;
+        *y = last_point.y;
+        return true;
+    }
+    if (last_point.pending)
+    {
+        last_point.pending = false;
+        *x = last_point.x;
+        *y = last_point.y;
+        return true;
+    }
+    return false;
+}
+
 #else
 void rg_touch_init(void) {}
 uint32_t rg_touch_read(void) { return 0; }
+bool rg_touch_get_point(int *x, int *y) { return false; }
 #endif

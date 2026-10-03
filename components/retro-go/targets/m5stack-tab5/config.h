@@ -40,6 +40,7 @@ bool rg_tab5_battery_read(float *level, float *volts, bool *charging);
 #define RG_GAMEPAD_USB_HID          1
 #define RG_GAMEPAD_BLE_HID          1
 #define RG_TOUCH_ST712X             1
+#define RG_GUI_TOUCH_KEYBOARD       1   // Taller keys and a button row (DEL, OK, ...) in the on-screen keyboard
 #define RG_SCREEN_DRIVER            2
 #define RG_GPIO_LCD_BCKL            GPIO_NUM_22
 #define RG_SCREEN_HOST              0

@@ -560,6 +560,29 @@ bool rg_input_touch_ui_active(void)
     return touch_ui_depth > 0 || rg_system_get_app()->isLauncher;
 }
 
+static int touch_raw_depth = 0;
+
+void rg_input_touch_raw_enter(void)
+{
+    touch_raw_depth++;
+}
+
+void rg_input_touch_raw_leave(void)
+{
+    if (touch_raw_depth > 0)
+        touch_raw_depth--;
+}
+
+bool rg_input_touch_raw_active(void)
+{
+    return touch_raw_depth > 0;
+}
+
+bool rg_input_read_touch(int *x, int *y)
+{
+    return rg_touch_get_point(x, y);
+}
+
 bool rg_input_key_is_present(rg_key_t mask)
 {
     return (gamepad_mapped & mask) == mask;
