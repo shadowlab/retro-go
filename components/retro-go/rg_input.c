@@ -580,7 +580,11 @@ bool rg_input_touch_raw_active(void)
 
 bool rg_input_read_touch(int *x, int *y)
 {
+#ifdef RG_TOUCH_ST712X
     return rg_touch_get_point(x, y);
+#else
+    return false;
+#endif
 }
 
 bool rg_input_key_is_present(rg_key_t mask)
