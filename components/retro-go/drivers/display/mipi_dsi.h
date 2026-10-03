@@ -1,4 +1,5 @@
 // MIPI-DSI display driver for ESP32-P4 boards (M5Stack Tab5, ST7121/ST7123 720x1280 panel).
+// Like the official BSP, the panel is told apart by the touch controller: firmware 1 is an ST7121, 3 an ST7123.
 //
 // The emulators render into a small logical canvas (RG_SCREEN_WIDTH x RG_SCREEN_HEIGHT) through the
 // regular lcd_* primitives. On sync, the PPA scales (and rotates) the canvas into the back buffer of
@@ -7,6 +8,13 @@
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_st7121.h>
+#include <esp_lcd_st7123.h>
+#include <esp_lcd_io_i2c.h>
+#include <esp_lcd_touch_st7123.h>
+#include <esp_idf_version.h>
+#include <driver/i2c_master.h>
+#include "rg_i2c.h"
+#include "st7123_init.h"
 #include <esp_ldo_regulator.h>
 #include <driver/ppa.h>
 #include <esp_cache.h>
@@ -39,11 +47,53 @@ static bool lcd_on_vsync(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_d
     return woken == pdTRUE;
 }
 
+typedef enum {LCD_PANEL_UNKNOWN, LCD_PANEL_ST7121, LCD_PANEL_ST7123, LCD_PANEL_ILI9881C} lcd_panel_type_t;
+
+// Same logic as bsp_detect_display_type() of the BSP. Needs the reset to be released and the I2C bus to be up.
+static lcd_panel_type_t lcd_detect_panel(void)
+{
+    i2c_master_bus_handle_t bus = rg_i2c_get_bus_handle();
+    if (!bus)
+        return LCD_PANEL_UNKNOWN;
+
+    if (i2c_master_probe(bus, 0x14, 50) == ESP_OK) // GT911 touch (backup address)
+        return LCD_PANEL_ILI9881C;
+
+    if (i2c_master_probe(bus, 0x55, 50) != ESP_OK)
+        return LCD_PANEL_UNKNOWN;
+
+    // ST7121/ST7123 touch controller, its firmware version register tells the two apart
+    esp_lcd_panel_io_handle_t tp_io = NULL;
+    esp_lcd_panel_io_i2c_config_t tp_cfg = ESP_LCD_TOUCH_IO_I2C_ST7123_CONFIG();
+    tp_cfg.scl_speed_hz = 100000;
+    lcd_panel_type_t type = LCD_PANEL_ST7123; // The BSP's fallback when the version is unreadable
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+    if (esp_lcd_new_panel_io_i2c(bus, &tp_cfg, &tp_io) == ESP_OK)
+#else
+    if (esp_lcd_new_panel_io_i2c_v2(bus, &tp_cfg, &tp_io) == ESP_OK)
+#endif
+    {
+        uint8_t fw_version = 0;
+        if (esp_lcd_panel_io_rx_param(tp_io, 0x0000, &fw_version, 1) == ESP_OK && fw_version == 1)
+            type = LCD_PANEL_ST7121;
+        esp_lcd_panel_io_del(tp_io);
+    }
+    return type;
+}
+
 static void lcd_init(void)
 {
-    RG_LOGI("Initializing ST7121 over MIPI-DSI...");
-
     rg_tab5_reset_lcd_and_touch();
+
+    lcd_panel_type_t panel_type = lcd_detect_panel();
+    RG_ASSERT(panel_type != LCD_PANEL_ILI9881C, "ILI9881C (GT911 touch) Tab5 panels are not supported");
+    if (panel_type == LCD_PANEL_UNKNOWN)
+    {
+        RG_LOGW("Panel not detected, assuming ST7121");
+        panel_type = LCD_PANEL_ST7121;
+    }
+    const bool is_st7121 = panel_type == LCD_PANEL_ST7121;
+    RG_LOGI("Initializing %s over MIPI-DSI...", is_st7121 ? "ST7121" : "ST7123");
 
     // Backlight
     ledc_timer_config_t timer = {
@@ -81,22 +131,37 @@ static void lcd_init(void)
     esp_lcd_dbi_io_config_t dbi_cfg = ST7121_PANEL_IO_DBI_CONFIG();
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_dbi(bus, &dbi_cfg, &io));
 
+    // Timing as in the BSP: 70 MHz, the vertical porches differ between the two controllers.
     // Framebuffers are RGB565, the panel is fed 24-bit like the vendor BSP does.
     esp_lcd_dpi_panel_config_t dpi_cfg = ST7121_1280_720_PANEL_60HZ_DPI_CONFIG_CF(LCD_COLOR_FMT_RGB565);
     dpi_cfg.out_color_format = LCD_COLOR_FMT_RGB888;
     dpi_cfg.num_fbs = 2;
+    dpi_cfg.video_timing.vsync_pulse_width = is_st7121 ? 20 : 2;
+    dpi_cfg.video_timing.vsync_back_porch = is_st7121 ? 24 : 8;
+    dpi_cfg.video_timing.vsync_front_porch = is_st7121 ? 200 : 220;
 
-    st7121_vendor_config_t vendor_cfg = {
-        .mipi_config = {.dsi_bus = bus, .dpi_config = &dpi_cfg},
-    };
     esp_lcd_panel_dev_config_t panel_cfg = {
         .reset_gpio_num = -1,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
         .data_endian = LCD_RGB_DATA_ENDIAN_LITTLE,
         .bits_per_pixel = 24,
-        .vendor_config = &vendor_cfg,
     };
-    ESP_ERROR_CHECK(esp_lcd_new_panel_st7121(io, &panel_cfg, &lcd_panel));
+    st7121_vendor_config_t st7121_cfg = {.mipi_config = {.dsi_bus = bus, .dpi_config = &dpi_cfg}};
+    st7123_vendor_config_t st7123_cfg = {
+        .init_cmds = st7123_init_cmds,
+        .init_cmds_size = sizeof(st7123_init_cmds) / sizeof(st7123_init_cmds[0]),
+        .mipi_config = {.dsi_bus = bus, .dpi_config = &dpi_cfg},
+    };
+    if (is_st7121)
+    {
+        panel_cfg.vendor_config = &st7121_cfg;
+        ESP_ERROR_CHECK(esp_lcd_new_panel_st7121(io, &panel_cfg, &lcd_panel));
+    }
+    else
+    {
+        panel_cfg.vendor_config = &st7123_cfg;
+        ESP_ERROR_CHECK(esp_lcd_new_panel_st7123(io, &panel_cfg, &lcd_panel));
+    }
     ESP_ERROR_CHECK(esp_lcd_panel_reset(lcd_panel));
     ESP_ERROR_CHECK(esp_lcd_panel_init(lcd_panel));
 
